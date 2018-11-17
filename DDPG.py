@@ -141,7 +141,7 @@ if __name__ == '__main__':
     checkpoint_path = "./model/my_ddpg.ckpt"
     with tf.Session() as sess:
         actor = Actor(sess, env.observation_space.shape[0],
-                      env.action_space.shape[0], ALPHA_A, TAU, 
+                      env.action_space.shape[0], ALPHA_A, TAU, BATCH_SIZE, 
                       env.action_space.high)
         critic = Critic(sess, env.observation_space.shape[0], 
                         env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         saved.restore(sess, checkpoint_path)
         state = sess.graph.get_tensor_by_name('Actor/s:0')
         learned_policy = sess.graph.get_tensor_by_name(
-                'Actor/pi_online_network/PI_hat/Tanh:0')
+                'Actor/pi_online_network/Mul:0')
 
         n_demonstrate = 3
         for ep in range(n_demonstrate):
@@ -169,3 +169,4 @@ if __name__ == '__main__':
             #print("number of steps in test: {}: {}".format(ep+1, test_steps))
             print("Reward in test {}: {:.3f}".format(ep+1, r))
         env.close()
+        pdb.set_trace()

@@ -6,21 +6,23 @@ from ReplayBuffer import ReplayBuffer
 from Ornstein_Uhlenbeck import Ornstein_Uhlenbeck
 
 class Actor:
-    def __init__(self, sess, n_states, n_actions, alpha, tau, action_bound):
+    def __init__(self, sess, n_states, n_actions, alpha, tau,
+                 batch_size, action_bound):
         ''' '''
         self.sess = sess
         self.n_states = n_states
         self.n_actions = n_actions
         self.alpha = alpha
         self.tau = tau
+        self.batch_size = batch_size
         self.action_bound = action_bound
 
         with tf.variable_scope("Actor"):
             self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
                                     name='s')
             ## from critic network
-            self.a = tf.placeholder(tf.float32, shape=(None, self.n_actions),
-                                     name='a')
+            self.a_grads = tf.placeholder(tf.float32, shape=(None, self.n_actions),
+                                         name='a_grads')
             
             with tf.variable_scope('pi_online_network') as scope:
                 self.PI_online = self.build_network(self.s, 
@@ -47,13 +49,16 @@ class Actor:
                                                 name="copy_online_to_target")
 
             with tf.name_scope("loss"):
-               self.action_grad = tf.gradients(self.PI_online, 
-                                               self.vars_PI_online,
-                                               -self.a)
+                self.actor_grads = tf.gradients(self.PI_online, 
+                                                self.vars_PI_online,
+                                                -self.a_grads)
+                '''
+                self.actor_grads = list(map(lambda x: tf.div(
+                                    x, self.batch_size), self.a_actor_grads))'''
 
             with tf.name_scope("train"):
                 optimizer = tf.train.AdamOptimizer(self.alpha)
-                self.training_op = optimizer.apply_gradients(zip(self.action_grad,
+                self.training_op = optimizer.apply_gradients(zip(self.actor_grads,
                                                              self.vars_PI_online))
             self.num_trainable_vars = len(self.vars_PI_online) + len(
                                           self.vars_PI_target)
@@ -88,7 +93,7 @@ class Actor:
         ## Apply batch normalization
         hidden2 = tf.layers.batch_normalization(hidden2)
 
-        ## Set final layer init weights to ensure initial value esttimates near 0
+        ## Set final layer init weights to ensure initial value estimates near 0
         PI_hat = tf.layers.dense(hidden2, self.n_actions, activation=tf.nn.tanh,
                                  name="PI_hat", 
                                  kernel_initializer=self.init_last(0.003),
@@ -98,6 +103,7 @@ class Actor:
                                  trainable=trainable,
                                  reuse=reuse)
         PI_hat_scaled = tf.multiply(PI_hat, self.action_bound)
+        #print(PI_hat_scaled.name)
         return PI_hat_scaled
     
     def predict(self, s):
@@ -112,7 +118,7 @@ class Actor:
 
     def train(self, x_batch, action_grad):
         self.sess.run(self.training_op, feed_dict={
-                            self.s: x_batch, self.a: action_grad})
+                            self.s: x_batch, self.a_grads: action_grad})
 
     def get_num_trainable_vars(self):
         return self.num_trainable_vars
