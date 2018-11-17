@@ -57,7 +57,7 @@ class Critic:
                 optimizer = tf.train.AdamOptimizer(self.alpha)
                 self.training_op = optimizer.minimize(self.loss)
 
-            self.action_grads = tf.gradients(self.Q_online, self.a)
+            self.q_grads = tf.gradients(self.Q_online, self.a)
 
     def fan_init(self, n):
         return tf.random_uniform_initializer(-1.0/np.sqrt(n), 1.0/np.sqrt(n))
@@ -77,19 +77,18 @@ class Critic:
                                   reuse=reuse)
         
         ## Apply batch normalization to layers prior to action input
-        hidden1 = tf.layers.batch_normalization(hidden1)
+        #hidden1 = tf.layers.batch_normalization(hidden1)
         
         ## Add action tensor to 2nd hidden layer
-        '''
-        aug_a = tf.layers.dense(self.a, 400, activation=tf.nn.relu,
+        aug_a = tf.layers.dense(a, 400, activation=tf.nn.relu,
                                 kernel_initializer=self.fan_init(self.n_states),
                                 bias_initializer=self.fan_init(self.n_states),
                                 kernel_regularizer=regularizer,
                                 bias_regularizer=regularizer,
                                 trainable=trainable,
                                 reuse=reuse)
-        aug = tf.concat([hidden1, aug_a], axis=1)'''
-        aug = tf.concat([hidden1, self.a], axis=1)
+        aug = tf.concat([hidden1, aug_a], axis=1)
+        #aug = tf.concat([hidden1, a], axis=1)
         hidden2 = tf.layers.dense(aug, 300, name="hidden2",
                                   activation=tf.nn.relu,
                                   kernel_initializer=self.fan_init(400),
@@ -125,8 +124,8 @@ class Critic:
         self.sess.run(self.training_op, feed_dict={
                       self.s: x_batch, self.a: a_batch, self.y: y_batch})
 
-    def get_action_grads(self, s, a):
-        return self.sess.run(self.action_grads, feed_dict={self.s: s, self.a: a})
+    def get_q_grads(self, s, a):
+        return self.sess.run(self.q_grads, feed_dict={self.s: s, self.a: a})
 
 if __name__ == '__main__':
     env = gym.make('MountainCarContinuous-v0')

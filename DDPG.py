@@ -22,7 +22,7 @@ logdir = "{}/run-{}/".format(root_logdir, now)
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 2000
+EPISODES = 2500
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -54,7 +54,7 @@ class DDPG:
             ep_steps = 0
             while not done:
                 #env.render()
-                a = self.actor.predict(s) + self.action_noise()
+                a = self.actor.predict(s, train_phase=False) + self.action_noise()
                 q_log.append(np.max(self.critic.predict(s, a), axis=-1))
                 s_, r, done, info = env.step(a[0])
                 self.replay_buffer.add_sample((s, a, r, s_))
@@ -65,9 +65,10 @@ class DDPG:
                     s__batch = np.zeros(shape=(len(batch), self.critic.n_states))
                     for i, (s, a, r, s_) in enumerate(batch):
                         s__batch[i] = s_
-
-                    q_hat_ = self.critic.predict_target_batch(s__batch,
-                                        self.actor.predict_target_batch(s__batch))
+                    
+                    a_hat_ = self.actor.predict_target_batch(s__batch,
+                                                            train_phase=False)
+                    q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_)
 
                     x_batch = np.zeros((len(batch), self.critic.n_states))
                     y_batch = np.zeros((len(batch), self.critic.n_actions))
@@ -83,9 +84,10 @@ class DDPG:
 
                     self.critic.train(x_batch, a_batch, y_batch)
 
-                    a_hat = self.actor.predict_online_batch(x_batch)
-                    grads = self.critic.get_action_grads(x_batch, a_hat)
-                    self.actor.train(x_batch, grads[0])
+                    a_hat = self.actor.predict_online_batch(x_batch, 
+                                                            train_phase=False)
+                    q_grads = self.critic.get_q_grads(x_batch, a_hat)
+                    self.actor.train(x_batch, q_grads[0], train_phase=True)
 
                 if self.steps % COPY_STEPS == 0:
                     self.sess.run(self.actor.copy_online_to_target)
