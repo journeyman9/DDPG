@@ -6,15 +6,16 @@ from ReplayBuffer import ReplayBuffer
 from Ornstein_Uhlenbeck import Ornstein_Uhlenbeck
 
 class Actor:
-    def __init__(self, n_states, n_actions, alpha, tau, action_bound):
+    def __init__(self, sess, n_states, n_actions, alpha, tau, action_bound):
         ''' '''
+        self.sess = sess
         self.n_states = n_states
         self.n_actions = n_actions
         self.alpha = alpha
         self.tau = tau
         self.action_bound = action_bound
 
-        with tf.variable_scope("policy_network"):
+        with tf.variable_scope("Actor"):
             self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
                                     name='s')
             ## from critic network
@@ -41,7 +42,7 @@ class Actor:
                 for i, var in enumerate(self.vars_PI_target):
                     copy_ops.append(var.assign(
                                 tf.multiply(self.vars_PI_online[i], self.tau) + \
-                                tf.multiply(self.vars_PI_online[i], 1-self.tau)))
+                                tf.multiply(self.vars_PI_target[i], 1-self.tau)))
                 self.copy_online_to_target = tf.group(*copy_ops,
                                                 name="copy_online_to_target")
 
@@ -99,19 +100,19 @@ class Actor:
         PI_hat_scaled = tf.multiply(PI_hat, self.action_bound)
         return PI_hat_scaled
     
-    def predict(self, s, sess):
-        return sess.run(self.PI_online, 
-                        feed_dict={self.s: s.reshape(1, s.shape[0])})
+    def predict(self, s):
+        return self.sess.run(self.PI_online, 
+                             feed_dict={self.s: s.reshape(1, s.shape[0])})
 
-    def predict_online_batch(self, s, sess):
-        return sess.run(self.PI_online, feed_dict={self.s: s})
+    def predict_online_batch(self, s):
+        return self.sess.run(self.PI_online, feed_dict={self.s: s})
 
-    def predict_target_batch(self, s, sess):
-        return sess.run(self.PI_target, feed_dict={self.s: s})
+    def predict_target_batch(self, s):
+        return self.sess.run(self.PI_target, feed_dict={self.s: s})
 
-    def train(self, replay_buffer, action_grad, sess):
-        sess.run(self.training_op, feed_dict={
-                            self.s: x_batch, self.y: y_batch})
+    def train(self, x_batch, action_grad):
+        self.sess.run(self.training_op, feed_dict={
+                            self.s: x_batch, self.a: action_grad})
 
     def get_num_trainable_vars(self):
         return self.num_trainable_vars
