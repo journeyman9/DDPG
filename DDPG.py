@@ -22,7 +22,7 @@ logdir = "{}/run-{}/".format(root_logdir, now)
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 2500
+EPISODES = 1000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -30,18 +30,21 @@ TRAIN_STEPS = 1
 TAU = .001
 
 class DDPG:
-    def __init__(self, sess, actor, critic, action_noise, replay_buffer):
+    def __init__(self, sess, critic, actor, action_noise, replay_buffer):
         ''' '''
         self.sess = sess
-        self.actor = actor
         self.critic = critic
+        self.actor = actor
         self.action_noise = action_noise
         self.replay_buffer = replay_buffer
         self.steps = 0
         self.q_value_log = []
         self.ep_steps_log = []
-        self.r_log = []
+        self.r_log = [] 
 
+        self.critic.copy_online_to_target()
+        self.actor.copy_online_to_target()
+ 
     def learn(self, env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE):
         # Tensorboard
         file_writer = tf.summary.FileWriter(logdir, graph=self.sess.graph)
@@ -55,20 +58,22 @@ class DDPG:
             while not done:
                 #env.render()
                 a = self.actor.predict(s, train_phase=False) + self.action_noise()
-                q_log.append(np.max(self.critic.predict(s, a), axis=-1))
+                q_log.append(self.critic.predict(s, a, train_phase=False))
                 s_, r, done, info = env.step(a[0])
                 self.replay_buffer.add_sample((s, a, r, s_))
 
                 if self.steps % TRAIN_STEPS == 0 and \
                                     self.replay_buffer.size() >= BATCH_SIZE:
                     batch = self.replay_buffer.sample_batch(BATCH_SIZE)
-                    s__batch = np.zeros(shape=(len(batch), self.critic.n_states))
+                    s__batch = np.zeros(shape=(len(batch), 
+                                        self.critic.n_states))
                     for i, (s, a, r, s_) in enumerate(batch):
                         s__batch[i] = s_
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
-                                                            train_phase=False)
-                    q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_)
+                                                             train_phase=False)
+                    q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_,
+                                                              train_phase=False)
 
                     x_batch = np.zeros((len(batch), self.critic.n_states))
                     y_batch = np.zeros((len(batch), self.critic.n_actions))
@@ -82,16 +87,17 @@ class DDPG:
                         y_batch[i] = y
                         a_batch[i] = a
 
-                    self.critic.train(x_batch, a_batch, y_batch)
-
+                    self.critic.train(x_batch, a_batch, y_batch, train_phase=True)
+                    
                     a_hat = self.actor.predict_online_batch(x_batch, 
                                                             train_phase=False)
-                    q_grads = self.critic.get_q_grads(x_batch, a_hat)
-                    self.actor.train(x_batch, q_grads[0], train_phase=True)
+                    qa_grads = self.critic.get_qa_grads(x_batch, a_hat, 
+                                                        train_phase=False)
+                    self.actor.train(x_batch, qa_grads[0], BATCH_SIZE, train_phase=True)
 
                 if self.steps % COPY_STEPS == 0:
-                    self.sess.run(self.actor.copy_online_to_target)
-                    self.sess.run(self.critic.copy_online_to_target)
+                    self.actor.copy_online_to_target()
+                    self.critic.copy_online_to_target()
 
                 s = s_
                 total_reward += r
@@ -142,17 +148,17 @@ if __name__ == '__main__':
     env = gym.make('MountainCarContinuous-v0')
     checkpoint_path = "./model/my_ddpg.ckpt"
     with tf.Session() as sess:
-        actor = Actor(sess, env.observation_space.shape[0],
-                      env.action_space.shape[0], ALPHA_A, TAU, BATCH_SIZE, 
-                      env.action_space.high)
         critic = Critic(sess, env.observation_space.shape[0], 
-                        env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
-                        actor.get_num_trainable_vars())
-        action_noise = Ornstein_Uhlenbeck(mu=np.zeros(env.action_space.shape[0]))
+                        env.action_space.shape[0], GAMMA, ALPHA_C, TAU)
+        actor = Actor(sess, env.observation_space.shape[0],
+                      env.action_space.shape[0], ALPHA_A, TAU, 
+                      env.action_space.high)
+        
         sess.run(tf.global_variables_initializer())
+        action_noise = Ornstein_Uhlenbeck(mu=np.zeros(env.action_space.shape[0]))
         replay_buffer = ReplayBuffer(MAX_BUFFER, BATCH_SIZE)
         replay_buffer.clear()
-        agent = DDPG(sess, actor, critic, action_noise, replay_buffer)
+        agent = DDPG(sess, critic, actor, action_noise, replay_buffer)
         saver = tf.train.Saver()
         agent.learn(env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE)
         saver.save(sess, checkpoint_path)
