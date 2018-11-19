@@ -130,14 +130,15 @@ class DDPG:
                 print('converged')
                 break
 
-    def test(self, env, policy, sess):
+    def test(self, env, policy, state, train_phase, sess):
         done = False
         s = env.reset()
         total_reward = 0.0
         steps = 0
         while not done:
             env.render()
-            a = sess.run(policy, feed_dict={state: s.reshape(1, s.shape[0])})
+            a = sess.run(policy, feed_dict={state: s.reshape(1, s.shape[0]),
+                                            train_phase: False})
             s_, r, done, info = env.step(a)
             s = s_
             total_reward += r
@@ -168,13 +169,14 @@ if __name__ == '__main__':
                                            clear_devices=True)
         saved.restore(sess, checkpoint_path)
         state = sess.graph.get_tensor_by_name('Actor/s:0')
+        train_phase = sess.graph.get_tensor_by_name('Actor/train_phase_actor:0')
         learned_policy = sess.graph.get_tensor_by_name(
                 'Actor/pi_online_network/Mul:0')
 
         n_demonstrate = 3
+        pdb.set_trace()
         for ep in range(n_demonstrate):
-            r = agent.test(env, learned_policy, sess)
+            r = agent.test(env, learned_policy, state, train_phase, sess)
             #print("number of steps in test: {}: {}".format(ep+1, test_steps))
             print("Reward in test {}: {:.3f}".format(ep+1, r))
         env.close()
-        pdb.set_trace()
