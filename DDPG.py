@@ -41,6 +41,7 @@ class DDPG:
         self.q_value_log = []
         self.ep_steps_log = []
         self.r_log = [] 
+        self.noise_log = []
 
         self.critic.copy_online_to_target()
         self.actor.copy_online_to_target()
@@ -52,13 +53,18 @@ class DDPG:
         for episode in range(EPISODES):
             done = False
             q_log = []
+            N_log = []
             total_reward = 0.0
+            self.action_noise.reset()
             s = env.reset()
             ep_steps = 0
             while not done:
                 #env.render()
-                a = self.actor.predict(s, train_phase=False) + self.action_noise()
+                N = self.action_noise()
+                a = self.actor.predict(s, train_phase=False) + N
+                N_log.append(N[0])
                 q_log.append(self.critic.predict(s, a, train_phase=False))
+                
                 s_, r, done, info = env.step(a[0])
                 self.replay_buffer.add_sample((s, a, r, s_))
 
@@ -96,8 +102,8 @@ class DDPG:
                     self.actor.train(x_batch, qa_grads[0], BATCH_SIZE, train_phase=True)
 
                 if self.steps % COPY_STEPS == 0:
-                    self.actor.copy_online_to_target()
-                    self.critic.copy_online_to_target()
+                    self.actor.slow_update_to_target()
+                    self.critic.slow_update_to_target()
 
                 s = s_
                 total_reward += r
@@ -107,6 +113,7 @@ class DDPG:
             self.q_value_log.append(np.mean(q_log))
             self.ep_steps_log.append(ep_steps)
             self.r_log.append(total_reward)
+            self.noise_log.append(np.mean(N_log))
 
             if total_reward > best_reward:
                 best_reward = total_reward
@@ -114,7 +121,8 @@ class DDPG:
                   "r: {:.3f}, ".format(total_reward) +
                   "best_r: {:.3f}, ".format(best_reward) + 
                   "qmax: {:.3f}, ".format(self.q_value_log[episode]) +
-                  "steps: {}".format(self.ep_steps_log[episode]))
+                  "steps: {}, ".format(self.ep_steps_log[episode]) +
+                  "N: {:.3f}".format(self.noise_log[episode]))
 
             # Tensorboard
             episode_summary = tf.Summary()

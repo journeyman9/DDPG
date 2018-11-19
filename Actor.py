@@ -69,11 +69,18 @@ class Actor:
             with tf.name_scope("copy"):
                 copy_ops = []
                 for i, var in enumerate(self.vars_PI_target):
-                    copy_ops.append(var.assign(
-                                tf.multiply(self.vars_PI_online[i], self.tau) + \
-                                tf.multiply(self.vars_PI_target[i], 1-self.tau)))
+                    copy_ops.append(var.assign(self.vars_PI_online[i]))
                 self.copy_online_2_target = tf.group(*copy_ops,
-                                                name="copy_online_to_target")
+                                                name="copy_online_2_target")
+
+            with tf.name_scope("slow_update"):
+                slow_update_ops = []
+                for i, var in enumerate(self.vars_PI_target):
+                    slow_update_ops.append(var.assign(
+                            tf.multiply(self.vars_PI_online[i], self.tau) + \
+                            tf.multiply(self.vars_PI_target[i], 1-self.tau)))
+                self.slow_update_2_target = tf.group(*slow_update_ops,
+                                                name="slow_update_target")
         with tf.name_scope("Actor_Loss"):
             raw_actor_grads = tf.gradients(self.PI_online, 
                                            self.vars_PI_online,
@@ -181,6 +188,9 @@ class Actor:
 
     def copy_online_to_target(self):
         self.sess.run(self.copy_online_2_target)
+
+    def slow_update_to_target(self):
+        self.sess.run(self.slow_update_2_target)
 
 if __name__ == '__main__':
     with tf.Session() as sess:

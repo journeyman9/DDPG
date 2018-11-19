@@ -74,11 +74,18 @@ class Critic:
             with tf.name_scope("copy"):
                 copy_ops = []
                 for i, var in enumerate(self.vars_Q_target):
-                    copy_ops.append(var.assign(
+                    copy_ops.append(var.assign(self.vars_Q_online[i]))
+                self.copy_online_2_target = tf.group(*copy_ops,
+                                                name="copy_online_2_target")
+
+            with tf.name_scope("slow_update"):
+                slow_update_ops = []
+                for i, var in enumerate(self.vars_Q_target):
+                    slow_update_ops.append(var.assign(
                             tf.multiply(self.vars_Q_online[i], self.tau) + \
                             tf.multiply(self.vars_Q_target[i], 1-self.tau)))
-                self.copy_online_2_target = tf.group(*copy_ops, 
-                                                name="copy_online_to_target")
+                self.slow_update_2_target = tf.group(*slow_update_ops, 
+                                                name="slow_update_2_target")
 
         with tf.name_scope("Critic_Loss"):
             self.loss = tf.losses.mean_squared_error(labels=self.y,
@@ -115,6 +122,8 @@ class Critic:
                                   activation=tf.nn.relu,
                                   kernel_initializer=self.fan_init(self.n_states),
                                   bias_initializer=self.fan_init(self.n_states),
+                                  kernel_regularizer=regularizer,
+                                  bias_regularizer=None,
                                   trainable=trainable,
                                   reuse=reuse)
         
@@ -131,7 +140,7 @@ class Critic:
                                   kernel_initializer=self.fan_init(400),
                                   bias_initializer=self.fan_init(400),
                                   kernel_regularizer=regularizer,
-                                  bias_regularizer=regularizer,
+                                  bias_regularizer=None,
                                   trainable=trainable,
                                   reuse=reuse)
         
@@ -140,8 +149,8 @@ class Critic:
                                 name="Q_hat",
                                 kernel_initializer=self.init_last(0.003),
                                 bias_initializer=self.init_last(0.003),
-                                kernel_regularizer=regularizer,
-                                bias_regularizer=regularizer,
+                                kernel_regularizer=None,
+                                bias_regularizer=None,
                                 trainable=trainable,
                                 reuse=reuse)
         return Q_hat
@@ -169,6 +178,8 @@ class Critic:
                       self.s: x_batch, self.a: a_batch, self.y: y_batch,
                       self.train_phase_critic: train_phase})
         '''
+    def slow_update_to_target(self):
+        self.sess.run(self.slow_update_2_target)
 
     def copy_online_to_target(self):
         self.sess.run(self.copy_online_2_target)
