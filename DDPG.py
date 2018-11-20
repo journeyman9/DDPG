@@ -62,6 +62,7 @@ class DDPG:
                 #env.render()
                 N = self.action_noise()
                 a = self.actor.predict(s, train_phase=False) + N
+
                 N_log.append(N[0])
                 q_log.append(self.critic.predict(s, a, train_phase=False))
                 

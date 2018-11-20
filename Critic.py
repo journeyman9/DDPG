@@ -83,7 +83,7 @@ class Critic:
                 for i, var in enumerate(self.vars_Q_target):
                     slow_update_ops.append(var.assign(
                             tf.multiply(self.vars_Q_online[i], self.tau) + \
-                            tf.multiply(self.vars_Q_target[i], 1-self.tau)))
+                            tf.multiply(self.vars_Q_target[i], 1.0-self.tau)))
                 self.slow_update_2_target = tf.group(*slow_update_ops, 
                                                 name="slow_update_2_target")
 
@@ -114,12 +114,16 @@ class Critic:
 
     def batch_norm_layer(self, x, train_phase, scope_bn):
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase, 
-                updates_collections=None, scope=scope_bn)
+                updates_collections=None, decay=0.5, scope=scope_bn)
     
     def build_network(self, s, a, trainable, reuse, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
+        
+        s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
+                                  scope_bn=n_scope+'0')
+
         hidden1 = tf.layers.dense(s, 400, name="hidden1",
-                                  activation=tf.nn.relu,
+                                  activation=None,
                                   kernel_initializer=self.fan_init(self.n_states),
                                   bias_initializer=self.fan_init(self.n_states),
                                   kernel_regularizer=regularizer,
@@ -130,19 +134,27 @@ class Critic:
         ## Apply batch normalization to layers prior to action input
         #hidden1 = tf.layers.batch_normalization(hidden1, training=self.train_phase_critic)
  
-        hidden1 = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
-                                        scope_bn=n_scope+'0')
-        
+        hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
+                                        scope_bn=n_scope+'1')
+
+        hidden1 = tf.nn.relu(hidden1)
+
         ## Add action tensor to 2nd hidden layer
-        aug = tf.concat([hidden1, a], axis=1)
-        hidden2 = tf.layers.dense(aug, 300, name="hidden2",
-                                  activation=tf.nn.relu,
-                                  kernel_initializer=self.fan_init(400),
-                                  bias_initializer=self.fan_init(400),
-                                  kernel_regularizer=regularizer,
-                                  bias_regularizer=None,
-                                  trainable=trainable,
-                                  reuse=reuse)
+        with tf.variable_scope("hidden2"):
+            w1 = tf.Variable(tf.random_uniform([400, 300], minval=-1.0/np.sqrt(400),
+                                               maxval=1.0/np.sqrt(400)),
+                                               trainable=trainable)
+            w2 = tf.Variable(tf.random_uniform([self.n_actions, 300], 
+                                                minval=-1.0/np.sqrt(400),
+                                                maxval=1.0/np.sqrt(400)),
+                                                trainable=trainable)
+            b = tf.Variable(tf.random_uniform([300], minval=-1.0/np.sqrt(400),
+                                              maxval=1.0/np.sqrt(400)),
+                                              trainable=trainable)
+        tf.contrib.layers.apply_regularization(regularizer, weights_list=[w1, w2])
+        augment = tf.matmul(hidden1, w1) + tf.matmul(a, w2) + b
+
+        hidden2 = tf.nn.relu(augment)
         
         ## Set final layer init weights to ensure initial value estimates near zero
         Q_hat = tf.layers.dense(hidden2, self.n_actions, activation=None, 

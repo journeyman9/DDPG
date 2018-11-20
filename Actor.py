@@ -11,7 +11,7 @@ class Actor:
         self.n_actions = n_actions
         self.alpha = alpha
         self.tau = tau
-        self.action_bound = action_bound
+        self.action_bound = tf.cast(action_bound, tf.float32)
         ''' 
         self.s = tf.get_default_graph().get_tensor_by_name("s/s:0")
         self.s_ = tf.get_default_graph().get_tensor_by_name("s_/s_:0")
@@ -78,7 +78,7 @@ class Actor:
                 for i, var in enumerate(self.vars_PI_target):
                     slow_update_ops.append(var.assign(
                             tf.multiply(self.vars_PI_online[i], self.tau) + \
-                            tf.multiply(self.vars_PI_target[i], 1-self.tau)))
+                            tf.multiply(self.vars_PI_target[i], 1.0-self.tau)))
                 self.slow_update_2_target = tf.group(*slow_update_ops,
                                                 name="slow_update_target")
         with tf.name_scope("Actor_Loss"):
@@ -86,7 +86,7 @@ class Actor:
                                            self.vars_PI_online,
                                            -self.qa_grads)
             self.actor_grads = list(map(lambda x: tf.div(
-                                    x, self.batch_size), 
+                                    x, tf.cast(self.batch_size, tf.float32)), 
                                     raw_actor_grads))
             ''' 
             self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, 
@@ -117,7 +117,7 @@ class Actor:
                         updates_collections=None, is_training=False, 
                         reuse=True, scope=scope_bn))'''
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase,
-               updates_collections=None, scope=scope_bn)
+               updates_collections=None, decay=0.5, scope=scope_bn)
 
     def build_network(self, s, trainable, reuse, n_scope):
         # Apply batch normalization to states
@@ -128,7 +128,7 @@ class Actor:
         
 
         hidden1 = tf.layers.dense(s, 400, name="hidden1",
-                                  activation=tf.nn.relu,
+                                  activation=None,
                                   kernel_initializer=self.fan_init(self.n_states),
                                   bias_initializer=self.fan_init(self.n_states),
                                   trainable=trainable,
@@ -138,9 +138,10 @@ class Actor:
          
         hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_actor,
                                             scope_bn=n_scope+'1')
+        hidden1 = tf.nn.relu(hidden1)
 
         hidden2 = tf.layers.dense(hidden1, 300, name="hidden2",
-                                  activation=tf.nn.relu,
+                                  activation=None,
                                   kernel_initializer=self.fan_init(400),
                                   bias_initializer=self.fan_init(400),
                                   trainable=trainable,
@@ -150,6 +151,7 @@ class Actor:
          
         hidden2 = self.batch_norm_layer(hidden2, train_phase=self.train_phase_actor,
                                         scope_bn=n_scope+'2')
+        hidden2 = tf.nn.relu(hidden2)
         
         ## Set final layer init weights to ensure initial value estimates near 0
         PI_hat = tf.layers.dense(hidden2, self.n_actions, activation=tf.nn.tanh,
@@ -159,7 +161,6 @@ class Actor:
                                  trainable=trainable,
                                  reuse=reuse)
         PI_hat_scaled = tf.multiply(PI_hat, self.action_bound)
-        #print(PI_hat_scaled.name)
         return PI_hat_scaled
     
     def predict(self, s, train_phase=None):
