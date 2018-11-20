@@ -50,7 +50,7 @@ class Actor:
             self.vars_PI_target = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
                                         scope='Actor/pi_target_network')
-            '''
+            '''            
             for i in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
                                        scope='Actor/pi_online_network'):
                 print(i.name)
@@ -63,8 +63,7 @@ class Actor:
             print()
             print(len(self.vars_PI_online))
             print(len(self.vars_PI_target))
-            exit()
-            '''
+            exit()'''
 
             with tf.name_scope("copy"):
                 copy_ops = []
@@ -88,15 +87,7 @@ class Actor:
             self.actor_grads = list(map(lambda x: tf.div(
                                     x, tf.cast(self.batch_size, tf.float32)), 
                                     raw_actor_grads))
-            ''' 
-            self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, 
-                                                scope='Actor')
-            with tf.control_dependencies(self.update_ops):
-                optimizer = tf.train.AdamOptimizer(self.alpha)
-                self.training_op = optimizer.apply_gradients(
-                                                zip(self.actor_grads,
-                                                self.vars_PI_online))
-            '''
+             
             optimizer = tf.train.AdamOptimizer(self.alpha)
             self.training_op = optimizer.apply_gradients(
                                                 zip(self.actor_grads,
@@ -109,23 +100,13 @@ class Actor:
         return tf.random_uniform_initializer(minval=-n, maxval=n)
     
     def batch_norm_layer(self, x, train_phase, scope_bn):
-        '''return tf.cond(train_phase, 
-                lambda: tf.contrib.layers.batch_norm(x, scale=True, 
-                        updates_collections=None, is_training=True, 
-                        reuse=None, scope=scope_bn), 
-                lambda: tf.contrib.layers.batch_norm(x, scale=True, 
-                        updates_collections=None, is_training=False, 
-                        reuse=True, scope=scope_bn))'''
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase,
-               updates_collections=None, decay=0.5, scope=scope_bn)
+               updates_collections=None, decay=0.999, scope=scope_bn)
 
     def build_network(self, s, trainable, reuse, n_scope):
         # Apply batch normalization to states
-        #s = tf.layers.batch_normalization(s, training=self.train_phase_actor)
-        
         s = self.batch_norm_layer(s, train_phase=self.train_phase_actor, 
-                                  scope_bn=n_scope+'0')
-        
+                                  scope_bn=n_scope+'0') 
 
         hidden1 = tf.layers.dense(s, 400, name="hidden1",
                                   activation=None,
@@ -134,8 +115,6 @@ class Actor:
                                   trainable=trainable,
                                   reuse=reuse)
         ## Apply batch normalization
-        #hidden1 = tf.layers.batch_normalization(hidden1, training=self.train_phase_actor)
-         
         hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_actor,
                                             scope_bn=n_scope+'1')
         hidden1 = tf.nn.relu(hidden1)
@@ -147,8 +126,6 @@ class Actor:
                                   trainable=trainable,
                                   reuse=reuse)
         ## Apply batch normalization
-        #hidden2 = tf.layers.batch_normalization(hidden2, training=self.train_phase_actor)
-         
         hidden2 = self.batch_norm_layer(hidden2, train_phase=self.train_phase_actor,
                                         scope_bn=n_scope+'2')
         hidden2 = tf.nn.relu(hidden2)
@@ -181,11 +158,6 @@ class Actor:
                             self.s: x_batch, self.qa_grads: qa_grads,
                             self.batch_size: batch_size,
                             self.train_phase_actor: train_phase})
-        '''
-        self.sess.run([self.training_op, self.update_ops], feed_dict={
-                            self.s: x_batch, self.qa_grads: qa_grads,
-                            self.train_phase_actor: train_phase})
-        '''
 
     def copy_online_to_target(self):
         self.sess.run(self.copy_online_2_target)

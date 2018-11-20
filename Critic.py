@@ -90,13 +90,6 @@ class Critic:
         with tf.name_scope("Critic_Loss"):
             self.loss = tf.losses.mean_squared_error(labels=self.y,
                                                      predictions=self.Q_online) 
-            ''' 
-            self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS,
-                                                scope='Critic')
-            with tf.control_dependencies(self.update_ops):
-                optimizer = tf.train.AdamOptimizer(self.alpha)
-                self.training_op = optimizer.minimize(self.loss)
-            '''
             optimizer = tf.train.AdamOptimizer(self.alpha)
             self.training_op = optimizer.minimize(self.loss)
 
@@ -114,7 +107,7 @@ class Critic:
 
     def batch_norm_layer(self, x, train_phase, scope_bn):
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase, 
-                updates_collections=None, decay=0.5, scope=scope_bn)
+                updates_collections=None, decay=0.999, scope=scope_bn)
     
     def build_network(self, s, a, trainable, reuse, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
@@ -132,8 +125,6 @@ class Critic:
                                   reuse=reuse)
         
         ## Apply batch normalization to layers prior to action input
-        #hidden1 = tf.layers.batch_normalization(hidden1, training=self.train_phase_critic)
- 
         hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
                                         scope_bn=n_scope+'1')
 
@@ -185,11 +176,7 @@ class Critic:
         self.sess.run(self.training_op, feed_dict={
                       self.s: x_batch, self.a: a_batch, self.y: y_batch,
                       self.train_phase_critic: train_phase})
-        '''
-        self.sess.run([self.training_op, self.update_ops], feed_dict={
-                      self.s: x_batch, self.a: a_batch, self.y: y_batch,
-                      self.train_phase_critic: train_phase})
-        '''
+    
     def slow_update_to_target(self):
         self.sess.run(self.slow_update_2_target)
 
