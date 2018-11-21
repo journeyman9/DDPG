@@ -20,6 +20,8 @@ class Critic:
                                      name='s_')
             self.a = tf.placeholder(tf.float32, shape=(None, self.n_actions),
                                     name='a')
+            self.a_ = tf.placeholder(tf.float32, shape=(None, self.n_actions),
+                                     name='a_')
             self.y = tf.placeholder(tf.float32, shape=(None, self.n_actions), 
                                     name='y')
             self.train_phase_critic = tf.placeholder(tf.bool, shape=(None),
@@ -31,7 +33,7 @@ class Critic:
 
             with tf.variable_scope('Q_target_network'):
                 self.Q_target = tf.stop_gradient(self.build_network(self.s_,
-                                                 self.a, trainable=True, 
+                                                 self.a_, trainable=True, 
                                                  n_scope='target_norm_'))
             
             self.vars_Q_online = tf.get_collection(
@@ -58,8 +60,10 @@ class Critic:
                                                 name="slow_update_2_target")
 
         with tf.name_scope("Critic_Loss"):
-            self.loss = tf.losses.mean_squared_error(labels=self.y,
-                                                     predictions=self.Q_online) 
+            '''self.loss = tf.losses.mean_squared_error(labels=self.y,
+                                                     predictions=self.Q_online)'''
+            td_error = tf.square(self.y - self.Q_online)
+            self.loss = tf.reduce_mean(td_error)
             optimizer = tf.train.AdamOptimizer(self.alpha)
             self.training_op = optimizer.minimize(self.loss)
 
@@ -133,8 +137,8 @@ class Critic:
         return self.sess.run(self.Q_online, feed_dict={self.s: s, self.a: a,
                              self.train_phase_critic: train_phase})
 
-    def predict_target_batch(self, s_, a, train_phase=None):
-        return self.sess.run(self.Q_target, feed_dict={self.s_: s_, self.a: a,
+    def predict_target_batch(self, s_, a_, train_phase=None):
+        return self.sess.run(self.Q_target, feed_dict={self.s_: s_, self.a_: a_,
                              self.train_phase_critic: train_phase})
     
     def train(self, x_batch, a_batch, y_batch, train_phase=None):

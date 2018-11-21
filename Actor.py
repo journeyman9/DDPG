@@ -58,7 +58,7 @@ class Actor:
                             tf.multiply(self.vars_pi_online[i], self.tau) + \
                             tf.multiply(self.vars_pi_target[i], 1.0-self.tau)))
                 self.slow_update_2_target = tf.group(*slow_update_ops,
-                                                name="slow_update_target")
+                                                name="slow_update_2_target")
         with tf.name_scope("Actor_Loss"):
             raw_actor_grads = tf.gradients(self.pi_online, 
                                            self.vars_pi_online,

@@ -55,27 +55,27 @@ class DDPG:
             q_log = []
             N_log = []
             total_reward = 0.0
-            self.action_noise.reset()
+            #self.action_noise.reset()
             s = env.reset()
             ep_steps = 0
             while not done:
                 #env.render()
                 N = self.action_noise()
-                a = self.actor.predict(s, train_phase=False) + N
+                a = self.actor.predict(s, train_phase=False)[0] + N
 
                 N_log.append(N[0])
                 q_log.append(self.critic.predict(s, a, train_phase=False))
                 
-                s_, r, done, info = env.step(a[0])
-                self.replay_buffer.add_sample((s, a[0], r, s_))
+                s_, r, done, info = env.step(a)
+                self.replay_buffer.add_sample((s, a, r, s_, done))
 
                 if self.steps % TRAIN_STEPS == 0 and \
                                     self.replay_buffer.size() >= BATCH_SIZE:
                     batch = self.replay_buffer.sample_batch(BATCH_SIZE)
                     s__batch = np.zeros(shape=(len(batch), 
                                         self.critic.n_states))
-                    for i, (s, a, r, s_) in enumerate(batch):
-                        s__batch[i] = s_
+                    for i, (state, action, reward, state_, terminal) in enumerate(batch):
+                        s__batch[i] = state_
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
                                                              train_phase=False)
@@ -85,14 +85,14 @@ class DDPG:
                     x_batch = np.zeros((len(batch), self.critic.n_states))
                     y_batch = np.zeros((len(batch), self.critic.n_actions))
                     a_batch = np.zeros((len(batch), self.critic.n_actions))
-                    for i, (s, a, r, s_) in enumerate(batch):
-                        if s_ is None:
-                            y = r
+                    for i, (state, action, reward, state_, terminal) in enumerate(batch):
+                        if terminal:
+                            y = reward
                         else:
-                            y = r + self.critic.gamma * q_hat_[i]
-                        x_batch[i] = s
+                            y = reward + self.critic.gamma * q_hat_[i]
+                        x_batch[i] = state
                         y_batch[i] = y
-                        a_batch[i] = a
+                        a_batch[i] = action
 
                     self.critic.train(x_batch, a_batch, y_batch, train_phase=True)
                     
@@ -158,6 +158,9 @@ if __name__ == '__main__':
     env = gym.make('MountainCarContinuous-v0')
     checkpoint_path = "./model/my_ddpg.ckpt"
     with tf.Session() as sess:
+        np.random.seed(0)
+        tf.set_random_seed(0)
+        env.seed(0)
         critic = Critic(sess, env.observation_space.shape[0], 
                         env.action_space.shape[0], GAMMA, ALPHA_C, TAU)
         actor = Actor(sess, env.observation_space.shape[0],
