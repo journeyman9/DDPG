@@ -27,41 +27,41 @@ class Actor:
                                              name='batch_size')
 
             with tf.variable_scope('pi_online_network'):
-                self.PI_online = self.build_network(self.s, 
+                self.pi_online = self.build_network(self.s, 
                                                     trainable=True,
                                                     n_scope='online_norm_')
 
             with tf.variable_scope('pi_target_network'):
-                self.PI_target = tf.stop_gradient(self.build_network(
+                self.pi_target = tf.stop_gradient(self.build_network(
                                                   self.s_,
                                                   trainable=True, 
                                                   n_scope='target_norm_'))
 
-            self.vars_PI_online = tf.get_collection(
+            self.vars_pi_online = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
                                         scope='Actor/pi_online_network')
-            self.vars_PI_target = tf.get_collection(
+            self.vars_pi_target = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
                                         scope='Actor/pi_target_network')
 
             with tf.name_scope("copy"):
                 copy_ops = []
-                for i, var in enumerate(self.vars_PI_target):
-                    copy_ops.append(var.assign(self.vars_PI_online[i]))
+                for i, var in enumerate(self.vars_pi_target):
+                    copy_ops.append(var.assign(self.vars_pi_online[i]))
                 self.copy_online_2_target = tf.group(*copy_ops,
                                                 name="copy_online_2_target")
 
             with tf.name_scope("slow_update"):
                 slow_update_ops = []
-                for i, var in enumerate(self.vars_PI_target):
+                for i, var in enumerate(self.vars_pi_target):
                     slow_update_ops.append(var.assign(
-                            tf.multiply(self.vars_PI_online[i], self.tau) + \
-                            tf.multiply(self.vars_PI_target[i], 1.0-self.tau)))
+                            tf.multiply(self.vars_pi_online[i], self.tau) + \
+                            tf.multiply(self.vars_pi_target[i], 1.0-self.tau)))
                 self.slow_update_2_target = tf.group(*slow_update_ops,
                                                 name="slow_update_target")
         with tf.name_scope("Actor_Loss"):
-            raw_actor_grads = tf.gradients(self.PI_online, 
-                                           self.vars_PI_online,
+            raw_actor_grads = tf.gradients(self.pi_online, 
+                                           self.vars_pi_online,
                                            -self.qa_grads)
             self.actor_grads = list(map(lambda x: tf.div(
                                     x, self.batch_size), 
@@ -70,7 +70,7 @@ class Actor:
             optimizer = tf.train.AdamOptimizer(self.alpha)
             self.training_op = optimizer.apply_gradients(
                                                 zip(self.actor_grads,
-                                                self.vars_PI_online))
+                                                self.vars_pi_online))
 
     def fan_init(self, n):
         return tf.random_uniform_initializer(-1.0/np.sqrt(n), 1.0/np.sqrt(n))
@@ -108,25 +108,25 @@ class Actor:
         hidden2 = tf.nn.relu(hidden2)
         
         ## Set final layer init weights to ensure initial value estimates near 0
-        PI_hat = tf.layers.dense(hidden2, self.n_actions, activation=tf.nn.tanh,
-                                 name="PI_hat", 
+        pi_hat = tf.layers.dense(hidden2, self.n_actions, activation=tf.nn.tanh,
+                                 name="pi_hat", 
                                  kernel_initializer=self.init_last(0.003),
                                  bias_initializer=self.init_last(0.003),
                                  trainable=trainable)
-        PI_hat_scaled = tf.multiply(PI_hat, self.action_bound)
-        return PI_hat_scaled
+        pi_hat_scaled = tf.multiply(pi_hat, self.action_bound)
+        return pi_hat_scaled
     
     def predict(self, s, train_phase=None):
-        return self.sess.run(self.PI_online, 
+        return self.sess.run(self.pi_online, 
                              feed_dict={self.s: s.reshape(1, s.shape[0]), 
                                     self.train_phase_actor: train_phase})
 
     def predict_online_batch(self, s, train_phase=None):
-        return self.sess.run(self.PI_online, feed_dict={self.s: s,
+        return self.sess.run(self.pi_online, feed_dict={self.s: s,
                                         self.train_phase_actor: train_phase})
 
     def predict_target_batch(self, s_, train_phase=None):
-        return self.sess.run(self.PI_target, feed_dict={self.s_: s_, 
+        return self.sess.run(self.pi_target, feed_dict={self.s_: s_, 
                                         self.train_phase_actor: train_phase})
 
     def train(self, x_batch, qa_grads, batch_size, train_phase=None):

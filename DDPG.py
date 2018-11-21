@@ -87,7 +87,6 @@ class DDPG:
                     a_batch = np.zeros((len(batch), self.critic.n_actions))
                     for i, (s, a, r, s_) in enumerate(batch):
                         if s_ is None:
-                            print('None')
                             y = r
                         else:
                             y = r + self.critic.gamma * q_hat_[i]
