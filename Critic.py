@@ -141,9 +141,9 @@ class Critic:
         return self.sess.run(self.Q_target, feed_dict={self.s_: s_, self.a_: a_,
                              self.train_phase_critic: train_phase})
     
-    def train(self, x_batch, a_batch, y_batch, train_phase=None):
+    def train(self, s_batch, a_batch, y_batch, train_phase=None):
         self.sess.run(self.training_op, feed_dict={
-                      self.s: x_batch, self.a: a_batch, self.y: y_batch,
+                      self.s: s_batch, self.a: a_batch, self.y: y_batch,
                       self.train_phase_critic: train_phase})
     
     def slow_update_to_target(self):

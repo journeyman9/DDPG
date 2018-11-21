@@ -129,9 +129,9 @@ class Actor:
         return self.sess.run(self.pi_target, feed_dict={self.s_: s_, 
                                         self.train_phase_actor: train_phase})
 
-    def train(self, x_batch, qa_grads, batch_size, train_phase=None):
+    def train(self, s_batch, qa_grads, batch_size, train_phase=None):
         self.sess.run(self.training_op, feed_dict={
-                            self.s: x_batch, self.qa_grads: qa_grads,
+                            self.s: s_batch, self.qa_grads: qa_grads,
                             self.batch_size: batch_size,
                             self.train_phase_actor: train_phase})
 

@@ -71,36 +71,30 @@ class DDPG:
 
                 if self.steps % TRAIN_STEPS == 0 and \
                                     self.replay_buffer.size() >= BATCH_SIZE:
-                    batch = self.replay_buffer.sample_batch(BATCH_SIZE)
-                    s__batch = np.zeros(shape=(len(batch), 
-                                        self.critic.n_states))
-                    for i, (state, action, reward, state_, terminal) in enumerate(batch):
-                        s__batch[i] = state_
+                    s_batch, a_batch, r_batch, s__batch, d_batch = \
+                                    self.replay_buffer.sample_batch(BATCH_SIZE)
+                    #print(s_batch[0], a_batch[0], r_batch[0], s__batch[0], d_batch[0])
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
                                                              train_phase=False)
                     q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_,
                                                               train_phase=False)
-
-                    x_batch = np.zeros((len(batch), self.critic.n_states))
-                    y_batch = np.zeros((len(batch), self.critic.n_actions))
-                    a_batch = np.zeros((len(batch), self.critic.n_actions))
-                    for i, (state, action, reward, state_, terminal) in enumerate(batch):
-                        if terminal:
-                            y = reward
+                    y_batch = []
+                    for i in range(BATCH_SIZE):
+                        if d_batch[i]:
+                            y_batch.append(r_batch[i])
                         else:
-                            y = reward + self.critic.gamma * q_hat_[i]
-                        x_batch[i] = state
-                        y_batch[i] = y
-                        a_batch[i] = action
+                            y_batch.append(r_batch[i] + self.critic.gamma * q_hat_[i])
 
-                    self.critic.train(x_batch, a_batch, y_batch, train_phase=True)
+                    self.critic.train(s_batch, a_batch,
+                                      np.reshape(y_batch, (BATCH_SIZE, 1)), 
+                                      train_phase=True)
                     
-                    a_hat = self.actor.predict_online_batch(x_batch, 
+                    a_hat = self.actor.predict_online_batch(s_batch, 
                                                             train_phase=False)
-                    qa_grads = self.critic.get_qa_grads(x_batch, a_hat, 
+                    qa_grads = self.critic.get_qa_grads(s_batch, a_hat, 
                                                         train_phase=False)
-                    self.actor.train(x_batch, qa_grads[0], BATCH_SIZE, train_phase=True)
+                    self.actor.train(s_batch, qa_grads[0], BATCH_SIZE, train_phase=True)
 
                 if self.steps % COPY_STEPS == 0:
                     self.actor.slow_update_to_target()
