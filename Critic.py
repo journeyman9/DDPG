@@ -12,19 +12,7 @@ class Critic:
         self.gamma = gamma
         self.alpha = alpha
         self.tau = tau
-        '''
-        with tf.variable_scope("s"):
-            self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
-                                    name='s')
-        with tf.variable_scope("s_"):
-            self.s_ = tf.placeholder(tf.float32, shape=(None, self.n_states),
-                                     name='s_')
-        with tf.variable_scope("a"):
-            self.a = tf.placeholder(tf.float32, shape=(None, self.n_actions),
-                                    name='a')
-        with tf.variable_scope("y"):
-            self.y = tf.placeholder(tf.float32, shape=(None, self.n_actions), 
-                                    name='y')'''
+        
         with tf.variable_scope("Critic"):
             self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
                                     name='s')
@@ -36,16 +24,14 @@ class Critic:
                                     name='y')
             self.train_phase_critic = tf.placeholder(tf.bool, shape=(None),
                                                     name='train_phase_critic') 
-            with tf.variable_scope('Q_online_network') as scope:
+            with tf.variable_scope('Q_online_network'):
                 self.Q_online = self.build_network(self.s, self.a, 
                                                    trainable=True, 
-                                                   reuse=False,
                                                    n_scope='online_norm_')
 
-            with tf.variable_scope('Q_target_network', reuse=False):
+            with tf.variable_scope('Q_target_network'):
                 self.Q_target = tf.stop_gradient(self.build_network(self.s_,
                                                  self.a, trainable=True, 
-                                                 reuse=False,
                                                  n_scope='target_norm_'))
             
             self.vars_Q_online = tf.get_collection(
@@ -54,23 +40,7 @@ class Critic:
             self.vars_Q_target = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
                                         scope='Critic/Q_target_network')
-            '''
-            for i in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope='Critic/Q_online_network'):
-                print(i.name)
-
-            print()
-
-            for i in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
-                                       scope='Critic/Q_target_network'):
-                print(i.name)
-
-            print()
-
-            print(len(self.vars_Q_online))
-            print(len(self.vars_Q_target))
-            '''
-
+            
             with tf.name_scope("copy"):
                 copy_ops = []
                 for i, var in enumerate(self.vars_Q_target):
@@ -94,9 +64,6 @@ class Critic:
             self.training_op = optimizer.minimize(self.loss)
 
         with tf.name_scope("qa_grads"):
-            '''self.qa_grads = tf.placeholder(tf.float32, 
-                                           shape=(None, self.n_actions), 
-                                           name='qa_grads')'''
             self.qa_gradients = tf.gradients(self.Q_online, self.a)
 
     def fan_init(self, n):
@@ -109,11 +76,11 @@ class Critic:
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase, 
                 updates_collections=None, decay=0.999, scope=scope_bn)
     
-    def build_network(self, s, a, trainable, reuse, n_scope):
+    def build_network(self, s, a, trainable, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
         
-        s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
-                                  scope_bn=n_scope+'0')
+        '''s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
+                                  scope_bn=n_scope+'0')'''
 
         hidden1 = tf.layers.dense(s, 400, name="hidden1",
                                   activation=None,
@@ -121,12 +88,11 @@ class Critic:
                                   bias_initializer=self.fan_init(self.n_states),
                                   kernel_regularizer=regularizer,
                                   bias_regularizer=None,
-                                  trainable=trainable,
-                                  reuse=reuse)
+                                  trainable=trainable)
         
         ## Apply batch normalization to layers prior to action input
-        hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
-                                        scope_bn=n_scope+'1')
+        '''hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
+                                        scope_bn=n_scope+'1')'''
 
         hidden1 = tf.nn.relu(hidden1)
 
@@ -154,8 +120,7 @@ class Critic:
                                 bias_initializer=self.init_last(0.003),
                                 kernel_regularizer=None,
                                 bias_regularizer=None,
-                                trainable=trainable,
-                                reuse=reuse)
+                                trainable=trainable)
         return Q_hat
     
     def predict(self, s, a, train_phase=None):

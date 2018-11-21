@@ -67,7 +67,7 @@ class DDPG:
                 q_log.append(self.critic.predict(s, a, train_phase=False))
                 
                 s_, r, done, info = env.step(a[0])
-                self.replay_buffer.add_sample((s, a, r, s_))
+                self.replay_buffer.add_sample((s, a[0], r, s_))
 
                 if self.steps % TRAIN_STEPS == 0 and \
                                     self.replay_buffer.size() >= BATCH_SIZE:
@@ -87,6 +87,7 @@ class DDPG:
                     a_batch = np.zeros((len(batch), self.critic.n_actions))
                     for i, (s, a, r, s_) in enumerate(batch):
                         if s_ is None:
+                            print('None')
                             y = r
                         else:
                             y = r + self.critic.gamma * q_hat_[i]
