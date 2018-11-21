@@ -22,12 +22,16 @@ logdir = "{}/run-{}/".format(root_logdir, now)
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 1000
+EPISODES = 2500
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
 TRAIN_STEPS = 1
+N_NEURONS1 = 400
+N_NEURONS2 = 300
 TAU = .001
+SEED = 0
+BN = True
 
 class DDPG:
     def __init__(self, sess, critic, actor, action_noise, replay_buffer):
@@ -61,7 +65,8 @@ class DDPG:
             while not done:
                 #env.render()
                 N = self.action_noise()
-                a = self.actor.predict(s, train_phase=False)[0] + N
+                a = np.clip(self.actor.predict(s, train_phase=False)[0] + N,
+                            env.action_space.low, env.action_space.high)
 
                 N_log.append(N[0])
                 q_log.append(self.critic.predict(s, a, train_phase=False))
@@ -73,7 +78,6 @@ class DDPG:
                                     self.replay_buffer.size() >= BATCH_SIZE:
                     s_batch, a_batch, r_batch, s__batch, d_batch = \
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
-                    #print(s_batch[0], a_batch[0], r_batch[0], s__batch[0], d_batch[0])
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
                                                              train_phase=False)
@@ -152,14 +156,15 @@ if __name__ == '__main__':
     env = gym.make('MountainCarContinuous-v0')
     checkpoint_path = "./model/my_ddpg.ckpt"
     with tf.Session() as sess:
-        np.random.seed(0)
-        tf.set_random_seed(0)
-        env.seed(0)
+        np.random.seed(SEED)
+        tf.set_random_seed(SEED)
+        env.seed(SEED)
         critic = Critic(sess, env.observation_space.shape[0], 
-                        env.action_space.shape[0], GAMMA, ALPHA_C, TAU)
+                        env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
+                        N_NEURONS1, N_NEURONS2, BN)
         actor = Actor(sess, env.observation_space.shape[0],
                       env.action_space.shape[0], ALPHA_A, TAU, 
-                      env.action_space.high)
+                      env.action_space.high, N_NEURONS1, N_NEURONS2, BN)
         
         sess.run(tf.global_variables_initializer())
         action_noise = Ornstein_Uhlenbeck(mu=np.zeros(env.action_space.shape[0]))

@@ -4,7 +4,8 @@ import pdb
 import gym
 
 class Actor:
-    def __init__(self, sess, n_states, n_actions, alpha, tau, action_bound):
+    def __init__(self, sess, n_states, n_actions, alpha, tau, action_bound,
+                 n_neurons1, n_neurons2, bn):
         ''' '''
         self.sess = sess
         self.n_states = n_states
@@ -12,6 +13,9 @@ class Actor:
         self.alpha = alpha
         self.tau = tau
         self.action_bound = tf.cast(action_bound, tf.float32)
+        self.n_neurons1 = n_neurons1
+        self.n_neurons2 = n_neurons2
+        self.bn = bn
 
         with tf.variable_scope("Actor"):
             self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
@@ -29,12 +33,14 @@ class Actor:
             with tf.variable_scope('pi_online_network'):
                 self.pi_online = self.build_network(self.s, 
                                                     trainable=True,
+                                                    bn=self.bn,
                                                     n_scope='online_norm_')
 
             with tf.variable_scope('pi_target_network'):
                 self.pi_target = tf.stop_gradient(self.build_network(
                                                   self.s_,
                                                   trainable=True, 
+                                                  bn=self.bn,
                                                   n_scope='target_norm_'))
 
             self.vars_pi_online = tf.get_collection(
@@ -82,29 +88,30 @@ class Actor:
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase,
                updates_collections=None, decay=0.999, scope=scope_bn)
 
-    def build_network(self, s, trainable, n_scope):
-        # Apply batch normalization to states
-        '''s = self.batch_norm_layer(s, train_phase=self.train_phase_actor, 
-                                  scope_bn=n_scope+'0') '''
-
-        hidden1 = tf.layers.dense(s, 400, name="hidden1",
+    def build_network(self, s, trainable, bn, n_scope):
+        if bn:
+            s = self.batch_norm_layer(s, train_phase=self.train_phase_actor, 
+                                      scope_bn=n_scope+'0')
+        hidden1 = tf.layers.dense(s, self.n_neurons1, name="hidden1",
                                   activation=None,
                                   kernel_initializer=self.fan_init(self.n_states),
                                   bias_initializer=self.fan_init(self.n_states),
                                   trainable=trainable)
-        ## Apply batch normalization
-        '''hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_actor,
-                                            scope_bn=n_scope+'1')'''
+        if bn:
+            hidden1 = self.batch_norm_layer(hidden1, 
+                                            train_phase=self.train_phase_actor,
+                                            scope_bn=n_scope+'1')
         hidden1 = tf.nn.relu(hidden1)
 
-        hidden2 = tf.layers.dense(hidden1, 300, name="hidden2",
+        hidden2 = tf.layers.dense(hidden1, self.n_neurons2, name="hidden2",
                                   activation=None,
                                   kernel_initializer=self.fan_init(400),
                                   bias_initializer=self.fan_init(400),
                                   trainable=trainable)
-        ## Apply batch normalization
-        '''hidden2 = self.batch_norm_layer(hidden2, train_phase=self.train_phase_actor,
-                                        scope_bn=n_scope+'2')'''
+        if bn:
+            hidden2 = self.batch_norm_layer(hidden2, 
+                                            train_phase=self.train_phase_actor,
+                                            scope_bn=n_scope+'2')
         hidden2 = tf.nn.relu(hidden2)
         
         ## Set final layer init weights to ensure initial value estimates near 0

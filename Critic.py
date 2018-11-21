@@ -4,7 +4,8 @@ import gym
 import pdb
 
 class Critic:
-    def __init__(self, sess, n_states, n_actions, gamma, alpha, tau):
+    def __init__(self, sess, n_states, n_actions, gamma, alpha, tau, n_neurons1,
+                 n_neurons2, bn):
         ''' '''
         self.sess = sess
         self.n_states = n_states
@@ -12,6 +13,9 @@ class Critic:
         self.gamma = gamma
         self.alpha = alpha
         self.tau = tau
+        self.n_neurons1 = n_neurons1
+        self.n_neurons2 = n_neurons2
+        self.bn = bn
         
         with tf.variable_scope("Critic"):
             self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
@@ -29,11 +33,13 @@ class Critic:
             with tf.variable_scope('Q_online_network'):
                 self.Q_online = self.build_network(self.s, self.a, 
                                                    trainable=True, 
+                                                   bn=bn,
                                                    n_scope='online_norm_')
 
             with tf.variable_scope('Q_target_network'):
                 self.Q_target = tf.stop_gradient(self.build_network(self.s_,
-                                                 self.a_, trainable=True, 
+                                                 self.a_, trainable=True,
+                                                 bn=bn,
                                                  n_scope='target_norm_'))
             
             self.vars_Q_online = tf.get_collection(
@@ -60,8 +66,6 @@ class Critic:
                                                 name="slow_update_2_target")
 
         with tf.name_scope("Critic_Loss"):
-            '''self.loss = tf.losses.mean_squared_error(labels=self.y,
-                                                     predictions=self.Q_online)'''
             td_error = tf.square(self.y - self.Q_online)
             self.loss = tf.reduce_mean(td_error)
             optimizer = tf.train.AdamOptimizer(self.alpha)
@@ -80,37 +84,34 @@ class Critic:
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase, 
                 updates_collections=None, decay=0.999, scope=scope_bn)
     
-    def build_network(self, s, a, trainable, n_scope):
+    def build_network(self, s, a, trainable, bn, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
-        
-        '''s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
-                                  scope_bn=n_scope+'0')'''
-
-        hidden1 = tf.layers.dense(s, 400, name="hidden1",
+        fan = 1.0/np.sqrt(self.n_neurons1)
+        if bn:
+            s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
+                                      scope_bn=n_scope+'0')
+        hidden1 = tf.layers.dense(s, self.n_neurons1, name="hidden1",
                                   activation=None,
                                   kernel_initializer=self.fan_init(self.n_states),
                                   bias_initializer=self.fan_init(self.n_states),
                                   kernel_regularizer=regularizer,
                                   bias_regularizer=None,
                                   trainable=trainable)
-        
-        ## Apply batch normalization to layers prior to action input
-        '''hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
-                                        scope_bn=n_scope+'1')'''
-
+        if bn:
+            hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
+                                            scope_bn=n_scope+'1')
         hidden1 = tf.nn.relu(hidden1)
-
+        
         ## Add action tensor to 2nd hidden layer
         with tf.variable_scope("hidden2"):
-            w1 = tf.Variable(tf.random_uniform([400, 300], minval=-1.0/np.sqrt(400),
-                                               maxval=1.0/np.sqrt(400)),
+            w1 = tf.Variable(tf.random_uniform([self.n_neurons1, self.n_neurons2],
+                                               minval=-fan, maxval=fan),
                                                trainable=trainable)
-            w2 = tf.Variable(tf.random_uniform([self.n_actions, 300], 
-                                                minval=-1.0/np.sqrt(400),
-                                                maxval=1.0/np.sqrt(400)),
+            w2 = tf.Variable(tf.random_uniform([self.n_actions, self.n_neurons2], 
+                                                minval=-fan, maxval=fan),
                                                 trainable=trainable)
-            b = tf.Variable(tf.random_uniform([300], minval=-1.0/np.sqrt(400),
-                                              maxval=1.0/np.sqrt(400)),
+            b = tf.Variable(tf.random_uniform([self.n_neurons2], 
+                                              minval=-fan, maxval=fan),
                                               trainable=trainable)
         tf.contrib.layers.apply_regularization(regularizer, weights_list=[w1, w2])
         augment = tf.matmul(hidden1, w1) + tf.matmul(a, w2) + b
