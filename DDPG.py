@@ -13,6 +13,7 @@ from Critic import Critic
 from Actor import Actor
 from ReplayBuffer import ReplayBuffer
 from Ornstein_Uhlenbeck import Ornstein_Uhlenbeck
+import random
 import time
 from datetime import timedelta
 import os
@@ -29,7 +30,6 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12, 123, 1234]
-#SEEDS = [None]
 LABEL = 'baseline'
 BN = False
 
@@ -89,9 +89,9 @@ class DDPG:
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
-                                                             train_phase=True)
+                                                             train_phase=False)
                     q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_,
-                                                              train_phase=True)
+                                                              train_phase=False)
                     y_batch = []
                     for i in range(BATCH_SIZE):
                         if d_batch[i]:
@@ -143,7 +143,7 @@ class DDPG:
                                       tag="Avg_action")
             episode_summary.value.add(simple_value=self.ep_steps_log[episode], 
                                       tag="Steps")
-            file_writer.add_summary(episode_summary, episode+1)
+            file_writer.add_summary(episode_summary, global_step=episode+1)
             file_writer.flush()
 
             self.completed_episodes += 1
@@ -189,6 +189,8 @@ if __name__ == '__main__':
             np.random.seed(SEEDS[seed_idx])
             tf.set_random_seed(SEEDS[seed_idx])
             env.seed(SEEDS[seed_idx])
+            random.seed(SEEDS[seed_idx])
+
             critic = Critic(sess, env.observation_space.shape[0], 
                             env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
                             N_NEURONS1, N_NEURONS2, BN)
@@ -229,7 +231,7 @@ if __name__ == '__main__':
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
                 avg_test_reward.append(r)
-            avg_total_test_rewards.append(avg_test_reward)
+            avg_total_test_rewards.append(np.mean(avg_test_reward))
             env.close()
         tf.reset_default_graph()
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
@@ -241,4 +243,3 @@ if __name__ == '__main__':
     print("avg_t {}, ".format(timedelta(seconds=np.mean(avg_train_time))) +
           "std_t {}".format(timedelta(seconds=np.std(avg_train_time))))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    pdb.set_trace()
