@@ -13,16 +13,14 @@ from Critic import Critic
 from Actor import Actor
 from ReplayBuffer import ReplayBuffer
 from Ornstein_Uhlenbeck import Ornstein_Uhlenbeck
-
-# prevents merging of data for tensorboard from multiple runs
-now = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-root_logdir = "tf_logs"
-logdir = "{}/run-{}/".format(root_logdir, now)
+import time
+from datetime import timedelta
+import os
 
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 2500
+EPISODES = 300
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -30,8 +28,9 @@ TRAIN_STEPS = 1
 N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
-SEED = 0
-BN = True
+SEEDS = [0, 1, 12, 123, 1234]
+#SEEDS = [0]
+BN = False
 
 class DDPG:
     def __init__(self, sess, critic, actor, action_noise, replay_buffer):
@@ -47,6 +46,9 @@ class DDPG:
         self.r_log = [] 
         self.noise_log = []
         self.a_log = []
+
+        self.convergence_flag = False
+        self.completed_episodes = 0
 
         self.critic.copy_online_to_target()
         self.actor.copy_online_to_target()
@@ -142,9 +144,12 @@ class DDPG:
                                       tag="Steps")
             file_writer.add_summary(episode_summary, episode+1)
             file_writer.flush()
+
+            self.completed_episodes += 1
             
-            if np.mean(self.r_log[-100:]) > 90:
+            if np.mean(self.r_log[-1:]) > -10:
                 print('converged')
+                self.convergence_flag = True
                 break
 
     def test(self, env, policy, state, train_phase, sess):
@@ -153,7 +158,7 @@ class DDPG:
         total_reward = 0.0
         steps = 0
         while not done:
-            env.render()
+            #env.render()
             a = sess.run(policy, feed_dict={state: s.reshape(1, s.shape[0]),
                                             train_phase: False})
             s_, r, done, info = env.step(a)
@@ -163,41 +168,75 @@ class DDPG:
         return total_reward
 
 if __name__ == '__main__':
-    env = gym.make('MountainCarContinuous-v0')
-    checkpoint_path = "./model/my_ddpg.ckpt"
-    with tf.Session() as sess:
-        np.random.seed(SEED)
-        tf.set_random_seed(SEED)
-        env.seed(SEED)
-        critic = Critic(sess, env.observation_space.shape[0], 
-                        env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
-                        N_NEURONS1, N_NEURONS2, BN)
-        actor = Actor(sess, env.observation_space.shape[0],
-                      env.action_space.shape[0], ALPHA_A, TAU, 
-                      env.action_space.high, N_NEURONS1, N_NEURONS2, BN)
-        
-        sess.run(tf.global_variables_initializer())
-        action_noise = Ornstein_Uhlenbeck(mu=np.zeros(env.action_space.shape[0]))
-        replay_buffer = ReplayBuffer(MAX_BUFFER, BATCH_SIZE)
-        replay_buffer.clear()
-        agent = DDPG(sess, critic, actor, action_noise, replay_buffer)
-        saver = tf.train.Saver()
-        agent.learn(env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE)
-        saver.save(sess, checkpoint_path)
-        
-    with tf.Session(graph=tf.Graph()) as sess:
-        saved = tf.train.import_meta_graph(checkpoint_path + '.meta',
-                                           clear_devices=True)
-        saved.restore(sess, checkpoint_path)
-        state = sess.graph.get_tensor_by_name('Actor/s:0')
-        train_phase = sess.graph.get_tensor_by_name('Actor/train_phase_actor:0')
-        learned_policy = sess.graph.get_tensor_by_name(
-                'Actor/pi_online_network/Mul:0')
+    avg_total_test_rewards = []
+    avg_convergence_ep = []
+    convergence = []
+    avg_train_time = []
+    if not os.path.exists('./models'):
+        os.mkdir('./models')
 
-        n_demonstrate = 3
-        pdb.set_trace()
-        for ep in range(n_demonstrate):
-            r = agent.test(env, learned_policy, state, train_phase, sess)
-            #print("number of steps in test: {}: {}".format(ep+1, test_steps))
-            print("Reward in test {}: {:.3f}".format(ep+1, r))
-        env.close()
+    for seed_idx in range(len(SEEDS)):
+        env = gym.make('MountainCarContinuous-v0')
+        # prevents merging of data for tensorboard from multiple runs
+        now = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        root_logdir = "tf_logs"
+        logdir = "{}/run-{}/".format(root_logdir, now)
+
+        checkpoint_path = "./models/model" + str(seed_idx) + "/my_ddpg.ckpt"
+        with tf.Session() as sess:
+            np.random.seed(SEEDS[seed_idx])
+            tf.set_random_seed(SEEDS[seed_idx])
+            env.seed(SEEDS[seed_idx])
+            critic = Critic(sess, env.observation_space.shape[0], 
+                            env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
+                            N_NEURONS1, N_NEURONS2, BN)
+            actor = Actor(sess, env.observation_space.shape[0],
+                          env.action_space.shape[0], ALPHA_A, TAU, 
+                          env.action_space.high, N_NEURONS1, N_NEURONS2, BN)
+            
+            sess.run(tf.global_variables_initializer())
+            action_noise = Ornstein_Uhlenbeck(mu=np.zeros(env.action_space.shape[0]))
+            replay_buffer = ReplayBuffer(MAX_BUFFER, BATCH_SIZE)
+            replay_buffer.clear()
+            agent = DDPG(sess, critic, actor, action_noise, replay_buffer)
+            saver = tf.train.Saver()
+            
+            startTime = time.time()
+            agent.learn(env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE)
+            avg_train_time.append(time.time() - startTime)
+            convergence.append(agent.convergence_flag)
+            avg_convergence_ep.append(agent.completed_episodes)
+
+            
+            saver.save(sess, checkpoint_path)
+            
+        with tf.Session(graph=tf.Graph()) as sess:
+            avg_test_reward = []
+            saved = tf.train.import_meta_graph(checkpoint_path + '.meta',
+                                               clear_devices=True)
+            saved.restore(sess, checkpoint_path)
+            state = sess.graph.get_tensor_by_name('Actor/s:0')
+            train_phase = sess.graph.get_tensor_by_name('Actor/train_phase_actor:0')
+            learned_policy = sess.graph.get_tensor_by_name(
+                    'Actor/pi_online_network/Mul:0')
+
+            n_demonstrate = 25
+            #pdb.set_trace()
+            for ep in range(n_demonstrate):
+                r = agent.test(env, learned_policy, state, train_phase, sess)
+                #print("number of steps in test: {}: {}".format(ep+1, test_steps))
+                #print("Reward in test {}: {:.3f}".format(ep+1, r))
+                avg_test_reward.append(r)
+            avg_total_test_rewards.append(avg_test_reward)
+            env.close()
+        tf.reset_default_graph()
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    print("avg_r: {:.3f}, ".format(np.mean(avg_total_test_rewards)) + 
+          "std_r: {:.3f}, ".format(np.std(avg_total_test_rewards)) + 
+          "avg_cvg: {} eps, ".format(int(np.mean(avg_convergence_ep))) + 
+          "std_cvg: {} eps".format(int(np.std(avg_convergence_ep))))
+    print("Converged: {} times".format(sum(convergence)))
+    print("avg_t {}, ".format(timedelta(seconds=np.mean(avg_train_time))) +
+          "std_t {}".format(timedelta(seconds=np.std(avg_train_time))))
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    pdb.set_trace()
