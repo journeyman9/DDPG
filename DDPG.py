@@ -147,7 +147,7 @@ class DDPG:
 
             self.completed_episodes += 1
             
-            if np.mean(self.r_log[-1:]) > -10:
+            if np.mean(self.r_log[-100:]) > 90:
                 print('converged')
                 self.convergence_flag = True
                 break
