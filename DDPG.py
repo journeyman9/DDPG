@@ -46,6 +46,7 @@ class DDPG:
         self.ep_steps_log = []
         self.r_log = [] 
         self.noise_log = []
+        self.a_log = []
 
         self.critic.copy_online_to_target()
         self.actor.copy_online_to_target()
@@ -58,6 +59,7 @@ class DDPG:
             done = False
             q_log = []
             N_log = []
+            action_log = []
             total_reward = 0.0
             #self.action_noise.reset()
             s = env.reset()
@@ -65,10 +67,14 @@ class DDPG:
             while not done:
                 #env.render()
                 N = self.action_noise()
-                a = np.clip(self.actor.predict(s, train_phase=False)[0] + N,
+                a = self.actor.predict(s, train_phase=False)[0] 
+                
+                action_log.append(a)
+                N_log.append(N[0])
+
+                a = np.clip(a + N,
                             env.action_space.low, env.action_space.high)
 
-                N_log.append(N[0])
                 q_log.append(self.critic.predict(s, a, train_phase=False))
                 
                 s_, r, done, info = env.step(a)
@@ -80,9 +86,9 @@ class DDPG:
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
-                                                             train_phase=False)
+                                                             train_phase=True)
                     q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_,
-                                                              train_phase=False)
+                                                              train_phase=True)
                     y_batch = []
                     for i in range(BATCH_SIZE):
                         if d_batch[i]:
@@ -113,6 +119,7 @@ class DDPG:
             self.ep_steps_log.append(ep_steps)
             self.r_log.append(total_reward)
             self.noise_log.append(np.mean(N_log))
+            self.a_log.append(np.mean(action_log))
 
             if total_reward > best_reward:
                 best_reward = total_reward
@@ -121,13 +128,16 @@ class DDPG:
                   "best_r: {:.3f}, ".format(best_reward) + 
                   "qmax: {:.3f}, ".format(self.q_value_log[episode]) +
                   "steps: {}, ".format(self.ep_steps_log[episode]) +
-                  "N: {:.3f}".format(self.noise_log[episode]))
+                  "N: {:.3f}, ".format(self.noise_log[episode]) + 
+                  "a: {:.3f}".format(self.a_log[episode]))
 
             # Tensorboard
             episode_summary = tf.Summary()
+            episode_summary.value.add(simple_value=total_reward, tag="Reward")
             episode_summary.value.add(simple_value=self.q_value_log[episode], 
                                       tag="Avg_max_Q_hat")
-            episode_summary.value.add(simple_value=total_reward, tag="Reward")
+            episode_summary.value.add(simple_value=self.a_log[episode],
+                                      tag="Avg_action")
             episode_summary.value.add(simple_value=self.ep_steps_log[episode], 
                                       tag="Steps")
             file_writer.add_summary(episode_summary, episode+1)

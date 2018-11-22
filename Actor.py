@@ -59,10 +59,7 @@ class Actor:
             with tf.name_scope("slow_update"):
                 slow_update_ops = []
                 for i, var in enumerate(self.vars_pi_target):
-                    if var.name.startswith('Actor/pi_target_network/batch_norm'):
-                        pass
-                    else:
-                        slow_update_ops.append(var.assign(
+                    slow_update_ops.append(var.assign(
                             tf.multiply(self.vars_pi_online[i], self.tau) + \
                             tf.multiply(self.vars_pi_target[i], 1.0-self.tau)))
                 self.slow_update_2_target = tf.group(*slow_update_ops,
