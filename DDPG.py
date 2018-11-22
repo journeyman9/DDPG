@@ -29,7 +29,6 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12, 123, 1234]
-#SEEDS = [0]
 BN = False
 
 class DDPG:
@@ -180,7 +179,7 @@ if __name__ == '__main__':
         # prevents merging of data for tensorboard from multiple runs
         now = datetime.utcnow().strftime("%Y%m%d%H%M%S")
         root_logdir = "tf_logs"
-        logdir = "{}/run-{}/".format(root_logdir, now)
+        logdir = "{}/{}-run-{}/".format(root_logdir, str("model") + str(seed_idx), now) 
 
         checkpoint_path = "./models/model" + str(seed_idx) + "/my_ddpg.ckpt"
         with tf.Session() as sess:
