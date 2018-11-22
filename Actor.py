@@ -34,14 +34,14 @@ class Actor:
                 self.pi_online = self.build_network(self.s, 
                                                     trainable=True,
                                                     bn=self.bn,
-                                                    n_scope='online_norm_')
+                                                    n_scope='batch_norm')
 
             with tf.variable_scope('pi_target_network'):
                 self.pi_target = tf.stop_gradient(self.build_network(
                                                   self.s_,
                                                   trainable=True, 
                                                   bn=self.bn,
-                                                  n_scope='target_norm_'))
+                                                  n_scope='batch_norm'))
 
             self.vars_pi_online = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
@@ -49,7 +49,6 @@ class Actor:
             self.vars_pi_target = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
                                         scope='Actor/pi_target_network')
-
             with tf.name_scope("copy"):
                 copy_ops = []
                 for i, var in enumerate(self.vars_pi_target):
@@ -60,7 +59,10 @@ class Actor:
             with tf.name_scope("slow_update"):
                 slow_update_ops = []
                 for i, var in enumerate(self.vars_pi_target):
-                    slow_update_ops.append(var.assign(
+                    if var.name.startswith('Actor/pi_target_network/batch_norm'):
+                        pass
+                    else:
+                        slow_update_ops.append(var.assign(
                             tf.multiply(self.vars_pi_online[i], self.tau) + \
                             tf.multiply(self.vars_pi_target[i], 1.0-self.tau)))
                 self.slow_update_2_target = tf.group(*slow_update_ops,

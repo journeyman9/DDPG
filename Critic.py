@@ -34,13 +34,13 @@ class Critic:
                 self.Q_online = self.build_network(self.s, self.a, 
                                                    trainable=True, 
                                                    bn=bn,
-                                                   n_scope='online_norm_')
+                                                   n_scope='batch_norm')
 
             with tf.variable_scope('Q_target_network'):
                 self.Q_target = tf.stop_gradient(self.build_network(self.s_,
                                                  self.a_, trainable=True,
                                                  bn=bn,
-                                                 n_scope='target_norm_'))
+                                                 n_scope='batch_norm'))
             
             self.vars_Q_online = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
@@ -48,7 +48,6 @@ class Critic:
             self.vars_Q_target = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
                                         scope='Critic/Q_target_network')
-            
             with tf.name_scope("copy"):
                 copy_ops = []
                 for i, var in enumerate(self.vars_Q_target):
@@ -59,7 +58,10 @@ class Critic:
             with tf.name_scope("slow_update"):
                 slow_update_ops = []
                 for i, var in enumerate(self.vars_Q_target):
-                    slow_update_ops.append(var.assign(
+                    if var.name.startswith('Critic/Q_target_network/batch_norm'):
+                        pass
+                    else:
+                        slow_update_ops.append(var.assign(
                             tf.multiply(self.vars_Q_online[i], self.tau) + \
                             tf.multiply(self.vars_Q_target[i], 1.0-self.tau)))
                 self.slow_update_2_target = tf.group(*slow_update_ops, 
@@ -87,7 +89,7 @@ class Critic:
     def build_network(self, s, a, trainable, bn, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
         fan = 1.0/np.sqrt(self.n_neurons1)
-        '''
+        ''' 
         if bn:
             s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
                                       scope_bn=n_scope+'0')'''

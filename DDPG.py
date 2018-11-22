@@ -80,9 +80,9 @@ class DDPG:
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
-                                                             train_phase=True)
+                                                             train_phase=False)
                     q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_,
-                                                              train_phase=True)
+                                                              train_phase=False)
                     y_batch = []
                     for i in range(BATCH_SIZE):
                         if d_batch[i]:
