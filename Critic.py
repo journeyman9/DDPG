@@ -87,9 +87,10 @@ class Critic:
     def build_network(self, s, a, trainable, bn, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
         fan = 1.0/np.sqrt(self.n_neurons1)
+        '''
         if bn:
             s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
-                                      scope_bn=n_scope+'0')
+                                      scope_bn=n_scope+'0')'''
         hidden1 = tf.layers.dense(s, self.n_neurons1, name="hidden1",
                                   activation=None,
                                   kernel_initializer=self.fan_init(self.n_states),

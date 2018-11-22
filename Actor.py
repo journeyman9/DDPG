@@ -105,8 +105,8 @@ class Actor:
 
         hidden2 = tf.layers.dense(hidden1, self.n_neurons2, name="hidden2",
                                   activation=None,
-                                  kernel_initializer=self.fan_init(400),
-                                  bias_initializer=self.fan_init(400),
+                                  kernel_initializer=self.fan_init(self.n_neurons1),
+                                  bias_initializer=self.fan_init(self.n_neurons1),
                                   trainable=trainable)
         if bn:
             hidden2 = self.batch_norm_layer(hidden2, 
