@@ -5,7 +5,7 @@ import pdb
 
 class Critic:
     def __init__(self, sess, n_states, n_actions, gamma, alpha, tau, n_neurons1,
-                 n_neurons2, bn):
+                 n_neurons2, bn, seed):
         ''' '''
         self.sess = sess
         self.n_states = n_states
@@ -16,6 +16,7 @@ class Critic:
         self.n_neurons1 = n_neurons1
         self.n_neurons2 = n_neurons2
         self.bn = bn
+        self.seed = seed
         
         with tf.variable_scope("Critic"):
             self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
@@ -74,58 +75,68 @@ class Critic:
             self.qa_gradients = tf.gradients(self.Q_online, self.a)
 
     def fan_init(self, n):
-        return tf.random_uniform_initializer(-1.0/np.sqrt(n), 1.0/np.sqrt(n))
-
-    def init_last(self, n):
-        return tf.random_uniform_initializer(minval=-n, maxval=n)
+        return 1.0/np.sqrt(n)
 
     def batch_norm_layer(self, x, train_phase, scope_bn):
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase, 
-                updates_collections=None, decay=0.999, scope=scope_bn)
+                updates_collections=None, decay=0.999, epsilon=0.001, scope=scope_bn)
     
     def build_network(self, s, a, trainable, bn, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
-        fan = 1.0/np.sqrt(self.n_neurons1+self.n_actions)
-        ''' 
-        if bn:
-            s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
-                                      scope_bn=n_scope+'0')'''
-        hidden1 = tf.layers.dense(s, self.n_neurons1, name="hidden1",
-                                  activation=None,
-                                  kernel_initializer=self.fan_init(self.n_states),
-                                  bias_initializer=self.fan_init(self.n_states),
-                                  kernel_regularizer=regularizer,
-                                  bias_regularizer=None,
-                                  trainable=trainable)
-        if bn:
-            hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
+        with tf.variable_scope("hidden1"):
+            w1 = tf.Variable(self.fan_init(self.n_states) * 
+                             tf.contrib.stateless.stateless_truncated_normal(
+                                            [self.n_states, self.n_neurons1],
+                                            seed=[self.seed, 0]),
+                                            trainable=trainable)
+            b1 = tf.Variable(self.fan_init(self.n_states) * 
+                             tf.contrib.stateless.stateless_truncated_normal(
+                                            [self.n_neurons1],
+                                            seed=[self.seed+1, 0]),
+                                            trainable=trainable)
+            hidden1 = tf.matmul(s, w1) + b1
+        
+            if bn:
+                hidden1 = self.batch_norm_layer(hidden1, train_phase=self.train_phase_critic,
                                             scope_bn=n_scope+'1')
-        hidden1 = tf.nn.relu(hidden1)
+            hidden1 = tf.nn.relu(hidden1)
         
         ## Add action tensor to 2nd hidden layer
         with tf.variable_scope("hidden2"):
-            w1 = tf.Variable(tf.random_uniform([self.n_neurons1, self.n_neurons2],
-                                               minval=-fan, maxval=fan),
-                                               trainable=trainable)
-            w2 = tf.Variable(tf.random_uniform([self.n_actions, self.n_neurons2], 
-                                                minval=-fan, maxval=fan),
-                                                trainable=trainable)
-            b = tf.Variable(tf.random_uniform([self.n_neurons2], 
-                                              minval=-fan, maxval=fan),
+            w2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
+                             tf.contrib.stateless.stateless_truncated_normal(
+                                            [self.n_neurons1, self.n_neurons2], 
+                                            seed=[self.seed+2, 0]),
+                                            trainable=trainable)
+            w3 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
+                             tf.contrib.stateless.stateless_truncated_normal(
+                                            [self.n_actions, self.n_neurons2], 
+                                            seed=[self.seed+3, 0]),
+                                            trainable=trainable)
+            b2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
+                             tf.contrib.stateless.stateless_truncated_normal(
+                                              [self.n_neurons2], 
+                                              seed=[self.seed+4, 0]),
                                               trainable=trainable)
-        tf.contrib.layers.apply_regularization(regularizer, weights_list=[w1, w2])
-        augment = tf.matmul(hidden1, w1) + tf.matmul(a, w2) + b
+            tf.contrib.layers.apply_regularization(regularizer, weights_list=[w1, w2])
+            augment = tf.matmul(hidden1, w2) + tf.matmul(a, w3) + b2
 
-        hidden2 = tf.nn.relu(augment)
+            hidden2 = tf.nn.relu(augment)
+
+        with tf.variable_scope("Q_hat"):
+            ## Set final layer init weights to ensure initial value estimates near zero
+            w4 = tf.Variable(.003 * 
+                             tf.contrib.stateless.stateless_truncated_normal(
+                                            [self.n_neurons2, self.n_actions],
+                                            seed=[self.seed+5, 0]),
+                                            trainable=trainable)
+            b3 = tf.Variable(.003 * 
+                             tf.contrib.stateless.stateless_truncated_normal(
+                                            [self.n_actions],
+                                            seed=[self.seed+6, 0]),
+                                            trainable=trainable)
+            Q_hat = tf.matmul(hidden2, w4) + b3
         
-        ## Set final layer init weights to ensure initial value estimates near zero
-        Q_hat = tf.layers.dense(hidden2, self.n_actions, activation=None, 
-                                name="Q_hat",
-                                kernel_initializer=self.init_last(0.003),
-                                bias_initializer=self.init_last(0.003),
-                                kernel_regularizer=None,
-                                bias_regularizer=None,
-                                trainable=trainable)
         return Q_hat
     
     def predict(self, s, a, train_phase=None):

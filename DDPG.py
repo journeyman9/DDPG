@@ -29,7 +29,8 @@ TRAIN_STEPS = 1
 N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
-SEEDS = [0, 1, 12, 123, 1234]
+#SEEDS = [0, 1, 12, 123, 1234]
+SEEDS = [1]
 LABEL = 'baseline'
 BN = False
 
@@ -175,9 +176,9 @@ if __name__ == '__main__':
     avg_train_time = []
     if not os.path.exists('./models'):
         os.mkdir('./models')
+    env = gym.make('MountainCarContinuous-v0')
 
     for seed_idx in range(len(SEEDS)):
-        env = gym.make('MountainCarContinuous-v0')
         # prevents merging of data for tensorboard from multiple runs
         now = datetime.utcnow().strftime("%Y%m%d%H%M%S")
         root_logdir = "tf_logs"
@@ -193,10 +194,11 @@ if __name__ == '__main__':
 
             critic = Critic(sess, env.observation_space.shape[0], 
                             env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
-                            N_NEURONS1, N_NEURONS2, BN)
+                            N_NEURONS1, N_NEURONS2, BN, SEEDS[seed_idx])
             actor = Actor(sess, env.observation_space.shape[0],
                           env.action_space.shape[0], ALPHA_A, TAU, 
-                          env.action_space.high, N_NEURONS1, N_NEURONS2, BN)
+                          env.action_space.high, N_NEURONS1, N_NEURONS2, BN,
+                          SEEDS[seed_idx])
             
             sess.run(tf.global_variables_initializer())
             action_noise = Ornstein_Uhlenbeck(mu=np.zeros(env.action_space.shape[0]))
@@ -222,7 +224,7 @@ if __name__ == '__main__':
             state = sess.graph.get_tensor_by_name('Actor/s:0')
             train_phase = sess.graph.get_tensor_by_name('Actor/train_phase_actor:0')
             learned_policy = sess.graph.get_tensor_by_name(
-                    'Actor/pi_online_network/Mul:0')
+                    'Actor/pi_online_network/pi_hat/Mul_2:0')
 
             n_demonstrate = 25
             #pdb.set_trace()
