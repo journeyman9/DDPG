@@ -83,17 +83,22 @@ class Critic:
     
     def build_network(self, s, a, trainable, bn, n_scope):
         regularizer = tf.contrib.layers.l2_regularizer(.01)
+        '''
+        if bn:
+            s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
+                                      scope=n_scope+'0')'''
         with tf.variable_scope("hidden1"):
             w1 = tf.Variable(self.fan_init(self.n_states) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_states, self.n_neurons1],
-                                            seed=[self.seed, 0]),
+                                            seed=[self.seed, 0]) - 1.0),
                                             trainable=trainable)
-            b1 = tf.Variable(self.fan_init(self.n_states) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            b1 = tf.Variable(self.fan_init(self.n_states) * 2 * 
+                            (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_neurons1],
-                                            seed=[self.seed+1, 0]),
+                                            seed=[self.seed+1, 0]) - 1.0),
                                             trainable=trainable)
+            tf.contrib.layers.apply_regularization(regularizer, weights_list=[w1])
             hidden1 = tf.matmul(s, w1) + b1
         
             if bn:
@@ -103,38 +108,39 @@ class Critic:
         
         ## Add action tensor to 2nd hidden layer
         with tf.variable_scope("hidden2"):
-            w2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            w2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
+                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_neurons1, self.n_neurons2], 
-                                            seed=[self.seed+2, 0]),
+                                            seed=[self.seed+2, 0]) - 1.0),
                                             trainable=trainable)
             w3 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_actions, self.n_neurons2], 
-                                            seed=[self.seed+3, 0]),
+                                            seed=[self.seed+3, 0]) - 1.0),
                                             trainable=trainable)
-            b2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            b2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
+                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                               [self.n_neurons2], 
-                                              seed=[self.seed+4, 0]),
+                                              seed=[self.seed+4, 0]) - 1.0),
                                               trainable=trainable)
-            tf.contrib.layers.apply_regularization(regularizer, weights_list=[w1, w2])
+            tf.contrib.layers.apply_regularization(regularizer, weights_list=[w2, w3])
             augment = tf.matmul(hidden1, w2) + tf.matmul(a, w3) + b2
 
             hidden2 = tf.nn.relu(augment)
 
         with tf.variable_scope("Q_hat"):
             ## Set final layer init weights to ensure initial value estimates near zero
-            w4 = tf.Variable(.003 * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            w4 = tf.Variable(.003 * (2 *
+                             tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_neurons2, self.n_actions],
-                                            seed=[self.seed+5, 0]),
+                                            seed=[self.seed+5, 0]) - 1.0),
                                             trainable=trainable)
-            b3 = tf.Variable(.003 * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            b3 = tf.Variable(.003 * (2 *
+                             tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_actions],
-                                            seed=[self.seed+6, 0]),
+                                            seed=[self.seed+6, 0]) - 1.0),
                                             trainable=trainable)
+            tf.contrib.layers.apply_regularization(regularizer, weights_list=[w4])
             Q_hat = tf.matmul(hidden2, w4) + b3
         
         return Q_hat

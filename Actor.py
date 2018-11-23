@@ -16,7 +16,7 @@ class Actor:
         self.n_neurons1 = n_neurons1
         self.n_neurons2 = n_neurons2
         self.bn = bn
-        self.seed = seed
+        self.seed = seed+1
 
         with tf.variable_scope("Actor"):
             self.s = tf.placeholder(tf.float32, shape=(None, self.n_states),
@@ -91,14 +91,14 @@ class Actor:
                                       scope_bn=n_scope+'0')
         with tf.variable_scope("hidden1"):
             w1 = tf.Variable(self.fan_init(self.n_states) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+                            (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                         [self.n_states, self.n_neurons1],
-                                        seed=[self.seed, 0]),
+                                        seed=[self.seed, 0]) - 1.0),
                                         trainable=trainable)
-            b1 = tf.Variable(self.fan_init(self.n_states) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            b1 = tf.Variable(self.fan_init(self.n_states) *
+                            (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                         [self.n_neurons1],
-                                        seed=[self.seed+1, 0]),
+                                        seed=[self.seed+1, 0]) - 1.0),
                                         trainable=trainable)
             hidden1 = tf.matmul(s, w1) + b1
             if bn:
@@ -108,15 +108,15 @@ class Actor:
             hidden1 = tf.nn.relu(hidden1)
 
         with tf.variable_scope("hidden2"):
-            w2 = tf.Variable(self.fan_init(self.n_neurons1) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            w2 = tf.Variable(self.fan_init(self.n_neurons1) *
+                            (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                         [self.n_neurons1, self.n_neurons2],
-                                        seed=[self.seed+2, 0]),
+                                        seed=[self.seed+2, 0]) - 1.0),
                                         trainable=trainable)
-            b2 = tf.Variable(self.fan_init(self.n_neurons1) * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            b2 = tf.Variable(self.fan_init(self.n_neurons1) *
+                            (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                         [self.n_neurons2],
-                                        seed=[self.seed+3, 0]),
+                                        seed=[self.seed+3, 0]) - 1.0),
                                         trainable=trainable)
             hidden2 = tf.matmul(hidden1, w2) + b2
     
@@ -128,15 +128,15 @@ class Actor:
         
         ## Set final layer init weights to ensure initial value estimates near 0
         with tf.variable_scope("pi_hat"):
-            w3 = tf.Variable(0.003 * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            w3 = tf.Variable(0.003 * (2.0 * 
+                             tf.contrib.stateless.stateless_random_uniform(
                                         [self.n_neurons2, self.n_actions],
-                                        seed=[self.seed+4, 0]),
+                                        seed=[self.seed+4, 0]) - 1.0),
                                         trainable=trainable)
-            b3 = tf.Variable(0.003 * 
-                             tf.contrib.stateless.stateless_truncated_normal(
+            b3 = tf.Variable(0.003 * (2.0 * 
+                             tf.contrib.stateless.stateless_random_uniform(
                                         [self.n_actions],
-                                        seed=[self.seed+5, 0]),
+                                        seed=[self.seed+5, 0]) - 1.0),
                                         trainable=trainable)
             pi_hat = tf.matmul(hidden2, w3) + b3
             pi_hat = tf.nn.tanh(pi_hat)

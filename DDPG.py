@@ -29,8 +29,7 @@ TRAIN_STEPS = 1
 N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
-#SEEDS = [0, 1, 12, 123, 1234]
-SEEDS = [1]
+SEEDS = [0, 1, 12, 123, 1234]
 LABEL = 'baseline'
 BN = False
 
@@ -186,12 +185,12 @@ if __name__ == '__main__':
                   str("seed-") + str(SEEDS[seed_idx])) 
 
         checkpoint_path = "./models/" + LABEL + "_seed_" + str(SEEDS[seed_idx]) + "/my_ddpg.ckpt"
-        with tf.Session() as sess:
-            np.random.seed(SEEDS[seed_idx])
-            tf.set_random_seed(SEEDS[seed_idx])
-            env.seed(SEEDS[seed_idx])
-            random.seed(SEEDS[seed_idx])
 
+        np.random.seed(SEEDS[seed_idx])
+        tf.set_random_seed(SEEDS[seed_idx])
+        env.seed(SEEDS[seed_idx])
+        random.seed(SEEDS[seed_idx])
+        with tf.Session() as sess:
             critic = Critic(sess, env.observation_space.shape[0], 
                             env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
                             N_NEURONS1, N_NEURONS2, BN, SEEDS[seed_idx])
@@ -224,7 +223,7 @@ if __name__ == '__main__':
             state = sess.graph.get_tensor_by_name('Actor/s:0')
             train_phase = sess.graph.get_tensor_by_name('Actor/train_phase_actor:0')
             learned_policy = sess.graph.get_tensor_by_name(
-                    'Actor/pi_online_network/pi_hat/Mul_2:0')
+                    'Actor/pi_online_network/pi_hat/Mul_4:0')
 
             n_demonstrate = 25
             #pdb.set_trace()
