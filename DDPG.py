@@ -29,9 +29,10 @@ TRAIN_STEPS = 1
 N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
-SEEDS = [0, 1, 12, 123, 1234]
+SEEDS = [0, 1, 12]
 LABEL = 'baseline'
 BN = False
+L2 = False
 
 class DDPG:
     def __init__(self, sess, critic, actor, action_noise, replay_buffer):
@@ -193,7 +194,7 @@ if __name__ == '__main__':
         with tf.Session() as sess:
             critic = Critic(sess, env.observation_space.shape[0], 
                             env.action_space.shape[0], GAMMA, ALPHA_C, TAU,
-                            N_NEURONS1, N_NEURONS2, BN, SEEDS[seed_idx])
+                            N_NEURONS1, N_NEURONS2, BN, L2, SEEDS[seed_idx])
             actor = Actor(sess, env.observation_space.shape[0],
                           env.action_space.shape[0], ALPHA_A, TAU, 
                           env.action_space.high, N_NEURONS1, N_NEURONS2, BN,

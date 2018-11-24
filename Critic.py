@@ -5,7 +5,7 @@ import pdb
 
 class Critic:
     def __init__(self, sess, n_states, n_actions, gamma, alpha, tau, n_neurons1,
-                 n_neurons2, bn, seed):
+                 n_neurons2, bn, l2, seed):
         ''' '''
         self.sess = sess
         self.n_states = n_states
@@ -16,6 +16,7 @@ class Critic:
         self.n_neurons1 = n_neurons1
         self.n_neurons2 = n_neurons2
         self.bn = bn
+        self.l2 = l2
         self.seed = seed
         
         with tf.variable_scope("Critic"):
@@ -34,12 +35,15 @@ class Critic:
             with tf.variable_scope('Q_online_network'):
                 self.Q_online = self.build_network(self.s, self.a, 
                                                    trainable=True, 
-                                                   bn=bn, reg=True)
+                                                   bn=bn,
+                                                   reg=self.l2,
+                                                   network='online')
 
             with tf.variable_scope('Q_target_network'):
                 self.Q_target = tf.stop_gradient(self.build_network(self.s_,
                                                  self.a_, trainable=True,
-                                                 bn=bn, reg=False))
+                                                 bn=bn, reg=False,
+                                                 network='target'))
             
             self.vars_Q_online = tf.get_collection(
                                         tf.GraphKeys.TRAINABLE_VARIABLES,
@@ -66,12 +70,12 @@ class Critic:
         with tf.name_scope("Critic_Loss"):
             td_error = tf.square(self.y - self.Q_online)
             self.loss = tf.reduce_mean(td_error)
-            regularizer = tf.contrib.layers.l2_regularizer(0.01)
-            reg_vars = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES,
-                                         scope='Critic/Q_online_network')
-            reg_term = tf.contrib.layers.apply_regularization(
-                                            regularizer, reg_vars)
-            self.loss += reg_term
+            if self.l2: 
+                #reg_term = tf.reduce_sum(tf.get_collection(
+                #                         tf.GraphKeys.REGULARIZATION_LOSSES,
+                #                         scope='Critic/Q_online_network'))
+                reg_term = tf.losses.get_regularization_loss()
+                self.loss += reg_term
 
             optimizer = tf.train.AdamOptimizer(self.alpha)
             self.training_op = optimizer.minimize(self.loss)
@@ -86,18 +90,57 @@ class Critic:
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase, 
                 updates_collections=None, decay=0.999, epsilon=0.001, scope=bn_scope)
     
-    def build_network(self, s, a, trainable, bn, reg):
+    def build_network(self, s, a, trainable, bn, reg, network):
         '''
         if bn:
             s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
                                       scope_bn='batch_norm0')'''
+        w1_init = tf.Variable(self.fan_init(self.n_states) * (
+                2.0 * tf.contrib.stateless.stateless_random_uniform(
+                                            [self.n_states, self.n_neurons1],
+                                            seed=[self.seed, 0]) - 1.0))
+        w2_init = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
+                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
+                                            [self.n_neurons1, self.n_neurons2], 
+                                            seed=[self.seed+2, 0]) - 1.0))
+        w3_init = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
+                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
+                                            [self.n_actions, self.n_neurons2], 
+                                            seed=[self.seed+3, 0]) - 1.0))
+        w4_init = tf.Variable(.003 * (2 *
+                             tf.contrib.stateless.stateless_random_uniform(
+                                            [self.n_neurons2, self.n_actions],
+                                            seed=[self.seed+5, 0]) - 1.0))
+        if network == 'online':
+            if reg:
+                regularizer = tf.contrib.layers.l2_regularizer(.01)
+            else:
+                regularizer = None
+            with tf.variable_scope('reg', regularizer=regularizer):
+                w1 = tf.get_variable(name='Critic/Q_online_network/hidden1/w1',
+                                     initializer=w1_init)
+                w2 = tf.get_variable(name='Critic/Q_online_network/hidden2/w2',
+                                     initializer=w2_init)
+                w3 = tf.get_variable(name='Critic/Q_online_network/hidden2/w3',
+                                     initializer=w3_init)
+                w4 = tf.get_variable(name='Critic/Q_online_network/Q_hat/w4',
+                                     initializer=w4_init)
+        elif network == 'target':
+                w1 = tf.get_variable(name='Critic/Q_target_network/hidden1/w1',
+                                     initializer=w1_init)
+                w2 = tf.get_variable(name='Critic/Q_target_network/hidden2/w2',
+                                     initializer=w2_init)
+                w3 = tf.get_variable(name='Critic/Q_target_network/hidden2/w3',
+                                     initializer=w3_init)
+                w4 = tf.get_variable(name='Critic/Q_target_network/Q_hat/w4',
+                                     initializer=w4_init)
+
         with tf.variable_scope("hidden1"):
-            w1 = tf.Variable(self.fan_init(self.n_states) * 
+            '''w1 = tf.Variable(self.fan_init(self.n_states) * 
                              (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_states, self.n_neurons1],
                                             seed=[self.seed, 0]) - 1.0),
-                                            trainable=trainable, name='w1')
-            tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, w1)
+                                            trainable=trainable, name='w1')'''
             b1 = tf.Variable(self.fan_init(self.n_states) * 2 * 
                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_neurons1],
@@ -112,7 +155,7 @@ class Critic:
         
         ## Add action tensor to 2nd hidden layer
         with tf.variable_scope("hidden2"):
-            w2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
+            '''w2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
                              (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_neurons1, self.n_neurons2], 
                                             seed=[self.seed+2, 0]) - 1.0),
@@ -121,9 +164,7 @@ class Critic:
                              (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_actions, self.n_neurons2], 
                                             seed=[self.seed+3, 0]) - 1.0),
-                                            trainable=trainable, name='w3')
-            tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, w2)
-            tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, w3)
+                                            trainable=trainable, name='w3')'''
             b2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
                              (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                               [self.n_neurons2], 
@@ -135,12 +176,11 @@ class Critic:
 
         with tf.variable_scope("Q_hat"):
             ## Set final layer init weights to ensure initial value estimates near zero
-            w4 = tf.Variable(.003 * (2 *
+            '''w4 = tf.Variable(.003 * (2 *
                              tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_neurons2, self.n_actions],
                                             seed=[self.seed+5, 0]) - 1.0),
-                                            trainable=trainable, name='w4')
-            tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, w4)
+                                            trainable=trainable, name='w4')'''
             b3 = tf.Variable(.003 * (2 *
                              tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_actions],
