@@ -71,9 +71,6 @@ class Critic:
             td_error = tf.square(self.y - self.Q_online)
             self.loss = tf.reduce_mean(td_error)
             if self.l2: 
-                #reg_term = tf.reduce_sum(tf.get_collection(
-                #                         tf.GraphKeys.REGULARIZATION_LOSSES,
-                #                         scope='Critic/Q_online_network'))
                 reg_term = tf.losses.get_regularization_loss()
                 self.loss += reg_term
 
@@ -86,15 +83,11 @@ class Critic:
     def fan_init(self, n):
         return 1.0/np.sqrt(n)
 
-    def batch_norm_layer(self, x, train_phase, bn_scope):
+    def batch_norm_layer(self, x, train_phase, scope_bn):
         return tf.contrib.layers.batch_norm(x, scale=True, is_training=train_phase, 
-                updates_collections=None, decay=0.999, epsilon=0.001, scope=bn_scope)
+                updates_collections=None, decay=0.999, epsilon=0.001, scope=scope_bn)
     
     def build_network(self, s, a, trainable, bn, reg, network):
-        '''
-        if bn:
-            s = self.batch_norm_layer(s, train_phase=self.train_phase_critic,
-                                      scope_bn='batch_norm0')'''
         w1_init = tf.Variable(self.fan_init(self.n_states) * (
                 2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_states, self.n_neurons1],
@@ -136,11 +129,6 @@ class Critic:
                                      initializer=w4_init)
 
         with tf.variable_scope("hidden1"):
-            '''w1 = tf.Variable(self.fan_init(self.n_states) * 
-                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
-                                            [self.n_states, self.n_neurons1],
-                                            seed=[self.seed, 0]) - 1.0),
-                                            trainable=trainable, name='w1')'''
             b1 = tf.Variable(self.fan_init(self.n_states) * 2 * 
                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_neurons1],
@@ -155,16 +143,6 @@ class Critic:
         
         ## Add action tensor to 2nd hidden layer
         with tf.variable_scope("hidden2"):
-            '''w2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
-                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
-                                            [self.n_neurons1, self.n_neurons2], 
-                                            seed=[self.seed+2, 0]) - 1.0),
-                                            trainable=trainable, name='w2')
-            w3 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) * 
-                             (2.0 * tf.contrib.stateless.stateless_random_uniform(
-                                            [self.n_actions, self.n_neurons2], 
-                                            seed=[self.seed+3, 0]) - 1.0),
-                                            trainable=trainable, name='w3')'''
             b2 = tf.Variable(self.fan_init(self.n_neurons1 + self.n_actions) *
                              (2.0 * tf.contrib.stateless.stateless_random_uniform(
                                               [self.n_neurons2], 
@@ -176,11 +154,6 @@ class Critic:
 
         with tf.variable_scope("Q_hat"):
             ## Set final layer init weights to ensure initial value estimates near zero
-            '''w4 = tf.Variable(.003 * (2 *
-                             tf.contrib.stateless.stateless_random_uniform(
-                                            [self.n_neurons2, self.n_actions],
-                                            seed=[self.seed+5, 0]) - 1.0),
-                                            trainable=trainable, name='w4')'''
             b3 = tf.Variable(.003 * (2 *
                              tf.contrib.stateless.stateless_random_uniform(
                                             [self.n_actions],

@@ -17,11 +17,12 @@ import random
 import time
 from datetime import timedelta
 import os
+import gym_truck_backerupper
 
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 300
+EPISODES = 3000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -30,8 +31,8 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'baseline'
-BN = False
+LABEL = 'trailer_run_0'
+BN = True
 L2 = False
 
 class DDPG:
@@ -65,7 +66,7 @@ class DDPG:
             N_log = []
             action_log = []
             total_reward = 0.0
-            #self.action_noise.reset()
+            self.action_noise.reset()
             s = env.reset()
             ep_steps = 0
             while not done:
@@ -90,9 +91,9 @@ class DDPG:
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
                     a_hat_ = self.actor.predict_target_batch(s__batch,
-                                                             train_phase=False)
+                                                             train_phase=True)
                     q_hat_ = self.critic.predict_target_batch(s__batch, a_hat_,
-                                                              train_phase=False)
+                                                              train_phase=True)
                     y_batch = []
                     for i in range(BATCH_SIZE):
                         if d_batch[i]:
