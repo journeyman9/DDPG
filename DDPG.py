@@ -1,4 +1,4 @@
-''' Mountain Car Problem using Deep Deterministic Policy Gradients
+''' TruckbackerUpper using Deep Deterministic Policy Gradients
 Journey McDowell (c) 2018
 '''
 
@@ -70,7 +70,7 @@ class DDPG:
             s = env.reset()
             ep_steps = 0
             while not done:
-                #env.render()
+                env.render()
                 N = self.action_noise()
                 a = self.actor.predict(s, train_phase=False)[0] 
                 
@@ -177,7 +177,8 @@ if __name__ == '__main__':
     avg_train_time = []
     if not os.path.exists('./models'):
         os.mkdir('./models')
-    env = gym.make('MountainCarContinuous-v0')
+    env = gym.make('TruckBackerUpper-v0').unwrapped
+    env.manual_velocity(-25)
 
     for seed_idx in range(len(SEEDS)):
         # prevents merging of data for tensorboard from multiple runs
