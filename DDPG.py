@@ -17,6 +17,8 @@ import random
 import time
 from datetime import timedelta
 import os
+import select
+import sys
 import gym_truck_backerupper
 
 GAMMA = 0.99
@@ -30,7 +32,7 @@ TRAIN_STEPS = 1
 N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
-SEEDS = [0, 1, 12]
+SEEDS = [0]
 LABEL = 'trailer_run_0'
 BN = True
 L2 = False
@@ -60,6 +62,7 @@ class DDPG:
         # Tensorboard
         file_writer = tf.summary.FileWriter(logdir, graph=self.sess.graph)
         best_reward = -float('inf')
+        start_rendering = False
         for episode in range(EPISODES):
             done = False
             q_log = []
@@ -70,7 +73,15 @@ class DDPG:
             s = env.reset()
             ep_steps = 0
             while not done:
-                env.render()
+                if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+                    if input() == 'render':
+                        start_rendering = True
+                    elif input() == 'hide':
+                        start_rendering = False
+                    else:
+                        pass
+                if start_rendering:
+                    env.render()
                 N = self.action_noise()
                 a = self.actor.predict(s, train_phase=False)[0] 
                 
