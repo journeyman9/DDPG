@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 3000
+EPISODES = 10000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -95,6 +95,12 @@ class DDPG:
                 
                 s_, r, done, info = env.step(a)
                 self.replay_buffer.add_sample((s, a, r, s_, done))
+                
+                if done:
+                    print()
+                    for keys, values in info.items():
+                        print(keys, values)
+                    print()
 
                 if self.steps % TRAIN_STEPS == 0 and \
                                     self.replay_buffer.size() >= BATCH_SIZE:
@@ -161,7 +167,7 @@ class DDPG:
 
             self.completed_episodes += 1
             
-            if np.mean(self.r_log[-100:]) > 90:
+            if np.mean(self.r_log[-100:]) > 3800:
                 print('converged')
                 self.convergence_flag = True
                 break
@@ -189,7 +195,6 @@ if __name__ == '__main__':
     if not os.path.exists('./models'):
         os.mkdir('./models')
     env = gym.make('TruckBackerUpper-v0').unwrapped
-    env.manual_velocity(-25)
 
     for seed_idx in range(len(SEEDS)):
         # prevents merging of data for tensorboard from multiple runs
