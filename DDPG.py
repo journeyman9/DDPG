@@ -63,6 +63,7 @@ class DDPG:
         file_writer = tf.summary.FileWriter(logdir, graph=self.sess.graph)
         best_reward = -float('inf')
         start_rendering = False
+        settle_model = False
         for episode in range(EPISODES):
             done = False
             q_log = []
@@ -74,14 +75,21 @@ class DDPG:
             ep_steps = 0
             while not done:
                 if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                    if input() == 'render':
-                        start_rendering = True
-                        print('set render')
+                    command = input()
+                    if command == 'render' or command == 'settle':
+                        if command == 'render':
+                            start_rendering = True
+                            print('set render...')
+                        elif command == 'settle':
+                            print('settling..')
+                            settle_model = True
                     else:
                         start_rendering = False
-                        print('hide render')
+                        env.close()
+                        print('hide render...')
                 if start_rendering:
                     env.render()
+
                 N = self.action_noise()
                 a = self.actor.predict(s, train_phase=False)[0] 
                 
@@ -101,6 +109,7 @@ class DDPG:
                     for key, value in info.items():
                         if value:
                             print(key, value)
+                    print('sim_i: ', env.sim_i)
                     print()
 
                 if self.steps % TRAIN_STEPS == 0 and \
@@ -168,10 +177,14 @@ class DDPG:
             file_writer.flush()
 
             self.completed_episodes += 1
-            
+             
             if np.mean(self.r_log[-100:]) > 10180:
                 print('converged')
                 self.convergence_flag = True
+                break
+            
+            if settle_model:
+                print('saving early...')
                 break
 
     def test(self, env, policy, state, train_phase, sess):
