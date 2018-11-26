@@ -76,10 +76,10 @@ class DDPG:
                 if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                     if input() == 'render':
                         start_rendering = True
-                    elif input() == 'hide':
-                        start_rendering = False
+                        print('set render')
                     else:
-                        pass
+                        start_rendering = False
+                        print('hide render')
                 if start_rendering:
                     env.render()
                 N = self.action_noise()
@@ -98,8 +98,9 @@ class DDPG:
                 
                 if done:
                     print()
-                    for keys, values in info.items():
-                        print(keys, values)
+                    for key, value in info.items():
+                        if value:
+                            print(key, value)
                     print()
 
                 if self.steps % TRAIN_STEPS == 0 and \
@@ -126,7 +127,8 @@ class DDPG:
                                                             train_phase=False)
                     qa_grads = self.critic.get_qa_grads(s_batch, a_hat, 
                                                         train_phase=False)
-                    self.actor.train(s_batch, qa_grads[0], BATCH_SIZE, train_phase=True)
+                    self.actor.train(s_batch, qa_grads[0], BATCH_SIZE, 
+                                     train_phase=True)
 
                 if self.steps % COPY_STEPS == 0:
                     self.actor.slow_update_to_target()
