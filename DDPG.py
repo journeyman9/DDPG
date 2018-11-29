@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 10000
+EPISODES = 5000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -33,7 +33,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0]
-LABEL = 'trailer_run_0'
+LABEL = 'reward_0'
 BN = True
 L2 = False
 
@@ -71,6 +71,9 @@ class DDPG:
             action_log = []
             total_reward = 0.0
             self.action_noise.reset()
+            #env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
+            env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
+            env.manual_offset(5.0, 0.0, 0.0)
             s = env.reset()
             ep_steps = 0
             while not done:
@@ -90,11 +93,15 @@ class DDPG:
                 if start_rendering:
                     env.render()
 
-                N = self.action_noise()
-                a = self.actor.predict(s, train_phase=False)[0] 
+                #N = self.action_noise()
+                #a = self.actor.predict(s, train_phase=False)[0] 
+                N = 0
+                K = np.array([-4.18926624030557, 12.761560483144, -1.0])
+                a = K.dot(s)
                 
                 action_log.append(a)
-                N_log.append(N[0])
+                #N_log.append(N[0])
+                N_log.append(N)
 
                 a = np.clip(a + N,
                             env.action_space.low, env.action_space.high)
@@ -262,6 +269,7 @@ if __name__ == '__main__':
             n_demonstrate = 25
             #pdb.set_trace()
             for ep in range(n_demonstrate):
+                env.manual_track = False
                 r = agent.test(env, learned_policy, state, train_phase, sess)
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
