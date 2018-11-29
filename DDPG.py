@@ -93,15 +93,15 @@ class DDPG:
                 if start_rendering:
                     env.render()
 
-                #N = self.action_noise()
-                #a = self.actor.predict(s, train_phase=False)[0] 
-                N = 0
-                K = np.array([-4.18926624030557, 12.761560483144, -1.0])
-                a = K.dot(s)
+                N = self.action_noise()
+                a = self.actor.predict(s, train_phase=False)[0] 
+                #N = 0
+                #K = np.array([-4.18926624030557, 12.761560483144, -1.0])
+                #a = K.dot(s)
                 
                 action_log.append(a)
-                #N_log.append(N[0])
-                N_log.append(N)
+                N_log.append(N[0])
+                #N_log.append(N)
 
                 a = np.clip(a + N,
                             env.action_space.low, env.action_space.high)
@@ -185,7 +185,7 @@ class DDPG:
 
             self.completed_episodes += 1
              
-            if np.mean(self.r_log[-100:]) > 10180:
+            if np.mean(self.r_log[-100:]) > 860:
                 print('converged')
                 self.convergence_flag = True
                 break
