@@ -32,8 +32,9 @@ TRAIN_STEPS = 1
 N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
+#SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'reward_0'
+LABEL = 'reward_5'
 BN = True
 L2 = False
 
@@ -51,6 +52,7 @@ class DDPG:
         self.r_log = [] 
         self.noise_log = []
         self.a_log = []
+        self.goal_log = []
 
         self.convergence_flag = False
         self.completed_episodes = 0
@@ -59,7 +61,7 @@ class DDPG:
         self.actor.copy_online_to_target()
  
     def learn(self, env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE):
-        # Tensorboard
+        # Tensorboard`
         file_writer = tf.summary.FileWriter(logdir, graph=self.sess.graph)
         best_reward = -float('inf')
         start_rendering = False
@@ -94,14 +96,15 @@ class DDPG:
                     env.render()
 
                 N = self.action_noise()
+                N_log.append(N[0])
                 a = self.actor.predict(s, train_phase=False)[0] 
+
                 #N = 0
+                #N_log.append(N)
                 #K = np.array([-4.18926624030557, 12.761560483144, -1.0])
                 #a = K.dot(s)
                 
                 action_log.append(a)
-                N_log.append(N[0])
-                #N_log.append(N)
 
                 a = np.clip(a + N,
                             env.action_space.low, env.action_space.high)
@@ -116,7 +119,6 @@ class DDPG:
                     for key, value in info.items():
                         if value:
                             print(key, value)
-                    print('sim_i: ', env.sim_i)
                     print()
 
                 if self.steps % TRAIN_STEPS == 0 and \
@@ -160,6 +162,7 @@ class DDPG:
             self.r_log.append(total_reward)
             self.noise_log.append(np.mean(N_log))
             self.a_log.append(np.mean(action_log))
+            self.goal_log.append(info['goal'])
 
             if total_reward > best_reward:
                 best_reward = total_reward
@@ -185,7 +188,8 @@ class DDPG:
 
             self.completed_episodes += 1
              
-            if np.mean(self.r_log[-100:]) > 860:
+            #if np.mean(self.r_log[-100:]) > 2840:
+            if sum(self.goal_log[-100:]) >= 75:
                 print('converged')
                 self.convergence_flag = True
                 break
@@ -200,7 +204,7 @@ class DDPG:
         total_reward = 0.0
         steps = 0
         while not done:
-            #env.render()
+            env.render()
             a = sess.run(policy, feed_dict={state: s.reshape(1, s.shape[0]),
                                             train_phase: False})
             s_, r, done, info = env.step(a)
@@ -266,10 +270,12 @@ if __name__ == '__main__':
             learned_policy = sess.graph.get_tensor_by_name(
                     'Actor/pi_online_network/pi_hat/Mul_4:0')
 
-            n_demonstrate = 25
-            #pdb.set_trace()
+            n_demonstrate = 3
+            pdb.set_trace()
             for ep in range(n_demonstrate):
-                env.manual_track = False
+                #env.manual_track = False
+                env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
+                env.manual_offset(5.0, 0.0, 0.0)
                 r = agent.test(env, learned_policy, state, train_phase, sess)
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
