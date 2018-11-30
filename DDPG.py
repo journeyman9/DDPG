@@ -34,7 +34,7 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'reward_5'
+LABEL = 'reward_6'
 BN = True
 L2 = False
 
