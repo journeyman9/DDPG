@@ -34,7 +34,7 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'reward_6'
+LABEL = 'reward_A'
 BN = True
 L2 = False
 
@@ -270,7 +270,7 @@ if __name__ == '__main__':
             learned_policy = sess.graph.get_tensor_by_name(
                     'Actor/pi_online_network/pi_hat/Mul_4:0')
 
-            n_demonstrate = 3
+            n_demonstrate = 1
             pdb.set_trace()
             for ep in range(n_demonstrate):
                 #env.manual_track = False
