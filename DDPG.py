@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 5000
+EPISODES = 1000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -53,6 +53,7 @@ class DDPG:
         self.noise_log = []
         self.a_log = []
         self.goal_log = []
+        self.w = 0.1
 
         self.convergence_flag = False
         self.completed_episodes = 0
@@ -75,7 +76,7 @@ class DDPG:
             self.action_noise.reset()
             #env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
             env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
-            env.manual_offset(5.0, 0.0, 0.0)
+            env.manual_offset(2.0, 0.0, 0.0)
             s = env.reset()
             ep_steps = 0
             while not done:
@@ -95,19 +96,27 @@ class DDPG:
                 if start_rendering:
                     env.render()
 
-                N = self.action_noise()
-                N_log.append(N[0])
+                #N = self.action_noise()
+                #N_log.append(N[0])
                 a = self.actor.predict(s, train_phase=False)[0] 
 
                 #N = 0
                 #N_log.append(N)
-                #K = np.array([-4.18926624030557, 12.761560483144, -1.0])
+                K = np.array([-27.6062, 99.8296, -7.8540])
                 #a = K.dot(s)
                 
-                action_log.append(a)
+                #action_log.append(a)
 
-                a = np.clip(a + N,
-                            env.action_space.low, env.action_space.high)
+                #a = np.clip(a + N,
+                #            env.action_space.low, env.action_space.high)
+
+                N = self.w * K.dot(s)
+                N_log.append(N)
+                if np.random.uniform(0, 1) < 0.5:
+                    a = np.clip((1 - self.w) * a + N, -1.0, 1.0)
+                else:
+                    pass
+                action_log.append(a)
 
                 q_log.append(self.critic.predict(s, a, train_phase=False))
                 
