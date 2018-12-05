@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 1000
+EPISODES = 4500
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -54,6 +54,8 @@ class DDPG:
         self.a_log = []
         self.goal_log = []
         self.w = 0.1
+        self.p = 1.0
+        self.p_decay = 1.150e-5
 
         self.convergence_flag = False
         self.completed_episodes = 0
@@ -62,7 +64,7 @@ class DDPG:
         self.actor.copy_online_to_target()
  
     def learn(self, env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE):
-        # Tensorboard`
+        # Tensorboard
         file_writer = tf.summary.FileWriter(logdir, graph=self.sess.graph)
         best_reward = -float('inf')
         start_rendering = False
@@ -109,15 +111,15 @@ class DDPG:
 
                 #a = np.clip(a + N,
                 #            env.action_space.low, env.action_space.high)
-
+                
                 N = self.w * K.dot(s)
                 N_log.append(N)
-                if np.random.uniform(0, 1) < 0.5:
+                if np.random.uniform(0, 1) < self.p:
                     a = np.clip((1 - self.w) * a + N, -1.0, 1.0)
                 else:
                     pass
                 action_log.append(a)
-
+                
                 q_log.append(self.critic.predict(s, a, train_phase=False))
                 
                 s_, r, done, info = env.step(a)
@@ -165,6 +167,8 @@ class DDPG:
                 total_reward += r
                 self.steps += 1
                 ep_steps += 1
+                self.p = 0.01 + (1.0 - 0.01) * \
+                         np.exp(-self.p_decay * self.steps)
                 
             self.q_value_log.append(np.mean(q_log))
             self.ep_steps_log.append(ep_steps)
@@ -181,7 +185,8 @@ class DDPG:
                   "qmax: {:.3f}, ".format(self.q_value_log[episode]) +
                   "steps: {}, ".format(self.ep_steps_log[episode]) +
                   "N: {:.3f}, ".format(self.noise_log[episode]) + 
-                  "a: {:.3f}".format(self.a_log[episode]))
+                  "a: {:.3f}, ".format(self.a_log[episode]) + 
+                  "p: {:.3f}".format(self.p))
 
             # Tensorboard
             episode_summary = tf.Summary()
@@ -198,7 +203,7 @@ class DDPG:
             self.completed_episodes += 1
              
             #if np.mean(self.r_log[-100:]) > 2840:
-            if sum(self.goal_log[-100:]) >= 75:
+            if sum(self.goal_log[-100:]) >= 81:
                 print('converged')
                 self.convergence_flag = True
                 break
