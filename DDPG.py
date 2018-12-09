@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 16000
+EPISODES = 2000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -199,7 +199,7 @@ class DDPG:
 
             self.completed_episodes += 1
             
-            if sum(self.goal_log[-100:]) >= 81:
+            if sum(self.goal_log[-100:]) >= 90:
                 print('converged')
                 self.convergence_flag = True
                 break
@@ -218,6 +218,12 @@ class DDPG:
             a = sess.run(policy, feed_dict={state: s.reshape(1, s.shape[0]),
                                             train_phase: False})
             s_, r, done, info = env.step(a)
+            if done:
+                print()
+                for key, value in info.items():
+                    if value:
+                        print(key, value)
+                print()
             s = s_
             total_reward += r
             steps += 1
