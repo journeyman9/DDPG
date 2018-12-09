@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 4500
+EPISODES = 16000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -34,7 +34,7 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'reward_A'
+LABEL = 'lqr_p_05'
 BN = True
 L2 = False
 
@@ -102,20 +102,17 @@ class DDPG:
                 #N_log.append(N[0])
                 a = self.actor.predict(s, train_phase=False)[0] 
 
-                #N = 0
-                #N_log.append(N)
+                N = 0
+                N_log.append(N)
                 K = np.array([-27.6062, 99.8296, -7.8540])
                 #a = K.dot(s)
                 
-                #action_log.append(a)
-
-                #a = np.clip(a + N,
-                #            env.action_space.low, env.action_space.high)
+                a = np.clip(a + N,
+                            env.action_space.low, env.action_space.high)
                 
-                N = self.w * K.dot(s)
-                N_log.append(N)
-                if np.random.uniform(0, 1) < self.p:
-                    a = np.clip((1 - self.w) * a + N, -1.0, 1.0)
+                if np.random.uniform(0, 1) < 0.5:
+                    a = np.clip(K.dot(s), env.action_space.low, 
+                                env.action_space.high)
                 else:
                     pass
                 action_log.append(a)
@@ -168,7 +165,7 @@ class DDPG:
                 self.steps += 1
                 ep_steps += 1
                 self.p = 0.01 + (1.0 - 0.01) * \
-                         np.exp(-self.p_decay * self.steps)
+                            np.exp(-self.p_decay * self.steps)
                 
             self.q_value_log.append(np.mean(q_log))
             self.ep_steps_log.append(ep_steps)
@@ -201,8 +198,7 @@ class DDPG:
             file_writer.flush()
 
             self.completed_episodes += 1
-             
-            #if np.mean(self.r_log[-100:]) > 2840:
+            
             if sum(self.goal_log[-100:]) >= 81:
                 print('converged')
                 self.convergence_flag = True
@@ -289,7 +285,7 @@ if __name__ == '__main__':
             for ep in range(n_demonstrate):
                 #env.manual_track = False
                 env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
-                env.manual_offset(5.0, 0.0, 0.0)
+                env.manual_offset(2.0, 0.0, 0.0)
                 r = agent.test(env, learned_policy, state, train_phase, sess)
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
