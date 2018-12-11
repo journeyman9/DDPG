@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 2000
+EPISODES = 1
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -34,7 +34,7 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'lqr_p_05'
+LABEL = 'repeatability'
 BN = True
 L2 = False
 
@@ -55,7 +55,7 @@ class DDPG:
         self.goal_log = []
         self.w = 0.1
         self.p = 1.0
-        self.p_decay = 1.150e-5
+        self.p_decay = 1.150e-5 * 1.875
 
         self.convergence_flag = False
         self.completed_episodes = 0
@@ -104,7 +104,7 @@ class DDPG:
 
                 N = 0
                 N_log.append(N)
-                K = np.array([-27.6062, 99.8296, -7.8540])
+                K = np.array([-27.606229206749300, 99.829605935742920, -7.853981633974539])
                 #a = K.dot(s)
                 
                 a = np.clip(a + N,
@@ -199,7 +199,7 @@ class DDPG:
 
             self.completed_episodes += 1
             
-            if sum(self.goal_log[-100:]) >= 90:
+            if sum(self.goal_log[-100:]) >= 80:
                 print('converged')
                 self.convergence_flag = True
                 break
