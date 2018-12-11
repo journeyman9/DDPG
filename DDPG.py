@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 1
+EPISODES = 4500
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -34,7 +34,7 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'repeatability'
+LABEL = 'lqr_p_05_strict'
 BN = True
 L2 = False
 
@@ -53,6 +53,12 @@ class DDPG:
         self.noise_log = []
         self.a_log = []
         self.goal_log = []
+        
+        # Unique to truck backerupper
+        self.rms_psi_1_log = []
+        self.rms_psi_2_log = []
+        self.rms_d2_log = []
+
         self.w = 0.1
         self.p = 1.0
         self.p_decay = 1.150e-5 * 1.875
@@ -62,6 +68,9 @@ class DDPG:
 
         self.critic.copy_online_to_target()
         self.actor.copy_online_to_target()
+
+    def rms(self, x, axis=None):
+        return np.sqrt(np.mean(np.square(x), axis=axis))
  
     def learn(self, env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE):
         # Tensorboard
@@ -74,6 +83,12 @@ class DDPG:
             q_log = []
             N_log = []
             action_log = []
+            
+            # Unique to truck backerupper
+            psi_1_e_log = []
+            psi_2_e_log = []
+            d2_e_log = []
+
             total_reward = 0.0
             self.action_noise.reset()
             #env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
@@ -121,6 +136,11 @@ class DDPG:
                 
                 s_, r, done, info = env.step(a)
                 self.replay_buffer.add_sample((s, a, r, s_, done))
+                
+                # Unique to truck backerupper
+                psi_1_e_log.append(s[0])
+                psi_2_e_log.append(s[1])
+                d2_e_log.append(s[2])
                 
                 if done:
                     print()
@@ -173,6 +193,11 @@ class DDPG:
             self.noise_log.append(np.mean(N_log))
             self.a_log.append(np.mean(action_log))
             self.goal_log.append(info['goal'])
+            
+            # Unique convergence criteria to truck backerupper
+            self.rms_psi_1_log.append(self.rms(psi_1_e_log))
+            self.rms_psi_2_log.append(self.rms(psi_2_e_log))
+            self.rms_d2_log.append(self.rms(d2_e_log))
 
             if total_reward > best_reward:
                 best_reward = total_reward
@@ -198,8 +223,15 @@ class DDPG:
             file_writer.flush()
 
             self.completed_episodes += 1
-            
-            if sum(self.goal_log[-100:]) >= 80:
+
+            print("Last 100: goal = {}, rms psi_1 = {:.4f}, rms d2 = {:.4f}".format(
+                  sum(self.goal_log[-100:]),
+                  np.mean(self.rms_psi_2_log[-100:]),
+                  np.mean(self.rms_d2_log[-100:])))
+
+            if (sum(self.goal_log[-100:]) >= 90 and 
+                np.mean(self.rms_psi_2_log[-100:]) <= 0.0897 * 1.10 and
+                np.mean(self.rms_d2_log[-100:]) <= 1.0542 * 1.10):
                 print('converged')
                 self.convergence_flag = True
                 break
@@ -266,17 +298,23 @@ if __name__ == '__main__':
             replay_buffer.clear()
             agent = DDPG(sess, critic, actor, action_noise, replay_buffer)
             saver = tf.train.Saver()
+
+            if len(sys.argv) >= 2:
+                saver.restore(sess, 
+                        tf.train.latest_checkpoint("./models/" + sys.argv[1] + "/"))
+                print('~~~~~~~~~~~~~~~~~~')
+                print('Model Restored')
+                print('~~~~~~~~~~~~~~~~~~')
             
             startTime = time.time()
             agent.learn(env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE)
             avg_train_time.append(time.time() - startTime)
             convergence.append(agent.convergence_flag)
-            avg_convergence_ep.append(agent.completed_episodes)
-
-            
+            avg_convergence_ep.append(agent.completed_episodes) 
             saver.save(sess, checkpoint_path)
-            
-        with tf.Session(graph=tf.Graph()) as sess:
+        tf.reset_default_graph()
+        
+        with tf.Session() as sess:
             avg_test_reward = []
             saved = tf.train.import_meta_graph(checkpoint_path + '.meta',
                                                clear_devices=True)
