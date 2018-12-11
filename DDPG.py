@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 4500
+EPISODES = 2600
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -34,7 +34,7 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'lqr_p_05_strict'
+LABEL = 'lqr_p_05_L2'
 BN = True
 L2 = False
 
@@ -224,7 +224,7 @@ class DDPG:
 
             self.completed_episodes += 1
 
-            print("Last 100: goal = {}, rms psi_1 = {:.4f}, rms d2 = {:.4f}".format(
+            print("Last 100: goal = {}, rms psi_2 = {:.4f}, rms d2 = {:.4f}".format(
                   sum(self.goal_log[-100:]),
                   np.mean(self.rms_psi_2_log[-100:]),
                   np.mean(self.rms_d2_log[-100:])))
