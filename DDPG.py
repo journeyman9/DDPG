@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 2600
+EPISODES = 600
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -34,8 +34,8 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'lqr_p_05_L2'
-BN = True
+LABEL = 'confirm'
+BN = False
 L2 = False
 
 class DDPG:
@@ -59,16 +59,15 @@ class DDPG:
         self.rms_psi_2_log = []
         self.rms_d2_log = []
 
-        self.w = 0.1
-        self.p = 1.0
-        self.p_decay = 1.150e-5 * 1.875
+        self.w = 0.5
 
         self.convergence_flag = False
         self.completed_episodes = 0
 
         self.critic.copy_online_to_target()
         self.actor.copy_online_to_target()
-
+    
+    # Unique to truck backerupper
     def rms(self, x, axis=None):
         return np.sqrt(np.mean(np.square(x), axis=axis))
  
@@ -113,19 +112,16 @@ class DDPG:
                 if start_rendering:
                     env.render()
 
-                #N = self.action_noise()
-                #N_log.append(N[0])
-                a = self.actor.predict(s, train_phase=False)[0] 
-
-                N = 0
-                N_log.append(N)
-                K = np.array([-27.606229206749300, 99.829605935742920, -7.853981633974539])
-                #a = K.dot(s)
-                
+                N = self.action_noise()
+                N_log.append(N[0])
+                a = self.actor.predict(s, train_phase=False)[0]  
                 a = np.clip(a + N,
                             env.action_space.low, env.action_space.high)
-                
+
+                K = np.array([-27.606229206749300, 99.829605935742920, -7.853981633974539]) 
                 if np.random.uniform(0, 1) < 0.5:
+                    #a = np.clip((1 - self.w) * a + self.w * K.dot(s),
+                    #            env.action_space.low, env.action_space.high)
                     a = np.clip(K.dot(s), env.action_space.low, 
                                 env.action_space.high)
                 else:
@@ -184,8 +180,6 @@ class DDPG:
                 total_reward += r
                 self.steps += 1
                 ep_steps += 1
-                self.p = 0.01 + (1.0 - 0.01) * \
-                            np.exp(-self.p_decay * self.steps)
                 
             self.q_value_log.append(np.mean(q_log))
             self.ep_steps_log.append(ep_steps)
@@ -207,8 +201,7 @@ class DDPG:
                   "qmax: {:.3f}, ".format(self.q_value_log[episode]) +
                   "steps: {}, ".format(self.ep_steps_log[episode]) +
                   "N: {:.3f}, ".format(self.noise_log[episode]) + 
-                  "a: {:.3f}, ".format(self.a_log[episode]) + 
-                  "p: {:.3f}".format(self.p))
+                  "a: {:.3f}, ".format(self.a_log[episode]))
 
             # Tensorboard
             episode_summary = tf.Summary()
@@ -228,7 +221,7 @@ class DDPG:
                   sum(self.goal_log[-100:]),
                   np.mean(self.rms_psi_2_log[-100:]),
                   np.mean(self.rms_d2_log[-100:])))
-
+            
             if (sum(self.goal_log[-100:]) >= 90 and 
                 np.mean(self.rms_psi_2_log[-100:]) <= 0.0897 * 1.10 and
                 np.mean(self.rms_d2_log[-100:]) <= 1.0542 * 1.10):
