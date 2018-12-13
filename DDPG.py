@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 600
+EPISODES = 2600
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -34,7 +34,7 @@ N_NEURONS2 = 300
 TAU = .001
 #SEEDS = [0, 1, 12, 123, 1234]
 SEEDS = [0]
-LABEL = 'confirm'
+LABEL = 'lqr_p_0_5'
 BN = False
 L2 = False
 
@@ -115,17 +115,17 @@ class DDPG:
                 N = self.action_noise()
                 N_log.append(N[0])
                 a = self.actor.predict(s, train_phase=False)[0]  
-                a = np.clip(a + N,
-                            env.action_space.low, env.action_space.high)
 
-                K = np.array([-27.606229206749300, 99.829605935742920, -7.853981633974539]) 
+                K = np.array([-27.606229206749300, 99.829605935742920, 
+                              -7.853981633974539]) 
                 if np.random.uniform(0, 1) < 0.5:
                     #a = np.clip((1 - self.w) * a + self.w * K.dot(s),
                     #            env.action_space.low, env.action_space.high)
                     a = np.clip(K.dot(s), env.action_space.low, 
                                 env.action_space.high)
                 else:
-                    pass
+                    a = np.clip(a + N, 
+                                env.action_space.low, env.action_space.high)
                 action_log.append(a)
                 
                 q_log.append(self.critic.predict(s, a, train_phase=False))
