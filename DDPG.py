@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 2600
+EPISODES = 1000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -33,7 +33,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'lqr_p_0_5'
+LABEL = 'reward_scheme_A'
 BN = False
 L2 = False
 
@@ -123,9 +123,8 @@ class DDPG:
                     a = np.clip(K.dot(s), env.action_space.low, 
                                 env.action_space.high)
                 else:
-                    a = np.clip(a, env.action_space.low, env.action_space.high)
-                    #a = np.clip(a + N, 
-                    #            env.action_space.low, env.action_space.high)
+                    a = np.clip(a + N, 
+                                env.action_space.low, env.action_space.high)
                 action_log.append(a)
                 
                 q_log.append(self.critic.predict(s, a, train_phase=False))
@@ -318,7 +317,7 @@ if __name__ == '__main__':
                     'Actor/pi_online_network/pi_hat/Mul_4:0')
 
             n_demonstrate = 1
-            pdb.set_trace()
+            #pdb.set_trace()
             for ep in range(n_demonstrate):
                 #env.manual_track = False
                 env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
