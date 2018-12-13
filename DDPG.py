@@ -124,8 +124,9 @@ class DDPG:
                     a = np.clip(K.dot(s), env.action_space.low, 
                                 env.action_space.high)
                 else:
-                    a = np.clip(a + N, 
-                                env.action_space.low, env.action_space.high)
+                    a = np.clip(a, env.action_space.low, env.action_space.high)
+                    #a = np.clip(a + N, 
+                    #            env.action_space.low, env.action_space.high)
                 action_log.append(a)
                 
                 q_log.append(self.critic.predict(s, a, train_phase=False))
