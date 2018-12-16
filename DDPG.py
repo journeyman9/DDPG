@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 1000
+EPISODES = 30000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -33,7 +33,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'lqr_v_a_N_decay_235'
+LABEL = 'trial_0_circle_track'
 BN = False
 L2 = False
 
@@ -96,8 +96,9 @@ class DDPG:
             total_reward = 0.0
             self.action_noise.reset()
             #env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
-            env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
-            env.manual_offset(2.0, 0.0, 0.0)
+            #env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
+            #env.manual_offset(2.0, 0.0, 0.0)
+            env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
             s = env.reset()
             ep_steps = 0
             while not done:
@@ -233,18 +234,18 @@ class DDPG:
                   np.mean(self.rms_d2_log[-100:])))
             
             if not self.decay_flag: 
-                if (sum(self.goal_log[-100:]) >= 90 and 
-                    np.mean(self.rms_psi_2_log[-100:]) <= 0.0897 * 1.10 and
-                    np.mean(self.rms_d2_log[-100:]) <= 1.0542 * 1.10):
+                if (sum(self.goal_log[-100:]) >= 70 and 
+                    np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
+                    np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('decaying LQR p...')
                     print('~~~~~~~~~~~~~~~~~~')
                     self.decay_flag = True
             
             if self.p <= 0.235:
-                if (sum(self.goal_log[-100:]) >= 90 and 
-                    np.mean(self.rms_psi_2_log[-100:]) <= 0.0897 * 1.10 and
-                    np.mean(self.rms_d2_log[-100:]) <= 1.0542 * 1.10):
+                if (sum(self.goal_log[-100:]) >= 70 and 
+                    np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
+                    np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
                     print('converged')
                     self.convergence_flag = True
                     break
@@ -343,8 +344,9 @@ if __name__ == '__main__':
             #pdb.set_trace()
             for ep in range(n_demonstrate):
                 #env.manual_track = False
-                env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
-                env.manual_offset(2.0, 0.0, 0.0)
+                #env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
+                #env.manual_offset(2.0, 0.0, 0.0)
+                env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
@@ -364,3 +366,4 @@ if __name__ == '__main__':
           "std_t {}".format(timedelta(seconds=np.std(avg_train_time))))
     print("goal = {}".format(total_test_goal_log))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    pdb.set_trace()
