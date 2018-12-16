@@ -33,7 +33,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'reward_scheme_A'
+LABEL = 'lqr_v_a_N_decay_235'
 BN = False
 L2 = False
 
@@ -61,6 +61,12 @@ class DDPG:
         self.w = 0.5
 
         self.convergence_flag = False
+
+        self.decay_flag = False
+        self.p = 0.5
+        self.p_decay = 30 * 1.150e-5
+        self.decay_steps = 0
+
         self.completed_episodes = 0
 
         self.critic.copy_online_to_target()
@@ -117,7 +123,7 @@ class DDPG:
 
                 K = np.array([-27.606229206749300, 99.829605935742920, 
                               -7.853981633974539]) 
-                if np.random.uniform(0, 1) < 0.5:
+                if np.random.uniform(0, 1) < self.p:
                     #a = np.clip((1 - self.w) * a + self.w * K.dot(s),
                     #            env.action_space.low, env.action_space.high)
                     a = np.clip(K.dot(s), env.action_space.low, 
@@ -179,6 +185,10 @@ class DDPG:
                 total_reward += r
                 self.steps += 1
                 ep_steps += 1
+                if self.decay_flag:
+                    self.p = 0.01 + (0.5 - 0.01) * \
+                             np.exp(-self.p_decay * self.decay_steps)
+                    self.decay_steps += 1
                 
             self.q_value_log.append(np.mean(q_log))
             self.ep_steps_log.append(ep_steps)
@@ -200,7 +210,8 @@ class DDPG:
                   "qmax: {:.3f}, ".format(self.q_value_log[episode]) +
                   "steps: {}, ".format(self.ep_steps_log[episode]) +
                   "N: {:.3f}, ".format(self.noise_log[episode]) + 
-                  "a: {:.3f}, ".format(self.a_log[episode]))
+                  "a: {:.3f}, ".format(self.a_log[episode]) + 
+                  "p: {:.3f}".format(self.p))
 
             # Tensorboard
             episode_summary = tf.Summary()
@@ -221,12 +232,22 @@ class DDPG:
                   np.mean(self.rms_psi_2_log[-100:]),
                   np.mean(self.rms_d2_log[-100:])))
             
-            if (sum(self.goal_log[-100:]) >= 90 and 
-                np.mean(self.rms_psi_2_log[-100:]) <= 0.0897 * 1.10 and
-                np.mean(self.rms_d2_log[-100:]) <= 1.0542 * 1.10):
-                print('converged')
-                self.convergence_flag = True
-                break
+            if not self.decay_flag: 
+                if (sum(self.goal_log[-100:]) >= 90 and 
+                    np.mean(self.rms_psi_2_log[-100:]) <= 0.0897 * 1.10 and
+                    np.mean(self.rms_d2_log[-100:]) <= 1.0542 * 1.10):
+                    print('~~~~~~~~~~~~~~~~~~')
+                    print('decaying LQR p...')
+                    print('~~~~~~~~~~~~~~~~~~')
+                    self.decay_flag = True
+            
+            if self.p <= 0.235:
+                if (sum(self.goal_log[-100:]) >= 90 and 
+                    np.mean(self.rms_psi_2_log[-100:]) <= 0.0897 * 1.10 and
+                    np.mean(self.rms_d2_log[-100:]) <= 1.0542 * 1.10):
+                    print('converged')
+                    self.convergence_flag = True
+                    break
             
             if settle_model:
                 print('saving early...')
@@ -251,10 +272,11 @@ class DDPG:
             s = s_
             total_reward += r
             steps += 1
-        return total_reward
+        return total_reward, info
 
 if __name__ == '__main__':
     avg_total_test_rewards = []
+    total_test_goal_log = []
     avg_convergence_ep = []
     convergence = []
     avg_train_time = []
@@ -308,6 +330,7 @@ if __name__ == '__main__':
         
         with tf.Session() as sess:
             avg_test_reward = []
+            test_goal_log = []
             saved = tf.train.import_meta_graph(checkpoint_path + '.meta',
                                                clear_devices=True)
             saved.restore(sess, checkpoint_path)
@@ -322,11 +345,13 @@ if __name__ == '__main__':
                 #env.manual_track = False
                 env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
                 env.manual_offset(2.0, 0.0, 0.0)
-                r = agent.test(env, learned_policy, state, train_phase, sess)
+                r, info = agent.test(env, learned_policy, state, train_phase, sess)
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
                 avg_test_reward.append(r)
+                test_goal_log.append(info['goal'])
             avg_total_test_rewards.append(np.mean(avg_test_reward))
+            total_test_goal_log.append(test_goal_log)
             env.close()
         tf.reset_default_graph()
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
@@ -337,4 +362,5 @@ if __name__ == '__main__':
     print("Converged: {} times".format(sum(convergence)))
     print("avg_t {}, ".format(timedelta(seconds=np.mean(avg_train_time))) +
           "std_t {}".format(timedelta(seconds=np.std(avg_train_time))))
+    print("goal = {}".format(total_test_goal_log))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
