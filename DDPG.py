@@ -19,6 +19,8 @@ from datetime import timedelta
 import os
 import select
 import sys
+import csv
+import ast
 import gym_truck_backerupper
 
 GAMMA = 0.99
@@ -67,6 +69,8 @@ class DDPG:
         self.p_decay = 30 * 1.150e-5
         self.decay_steps = 0
 
+        self.lesson_plan = None
+
         self.completed_episodes = 0
 
         self.critic.copy_online_to_target()
@@ -95,11 +99,9 @@ class DDPG:
 
             total_reward = 0.0
             self.action_noise.reset()
-            #env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
-            #env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
-            #env.manual_offset(2.0, 0.0, 0.0)
-            #env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
-            env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
+            if self.lesson_plan:
+                course = random.sample(self.lesson_plan, 1)[0]
+                env.manual_course(course[0], course[1])
             s = env.reset()
             ep_steps = 0
             while not done:
@@ -322,14 +324,27 @@ if __name__ == '__main__':
             replay_buffer.clear()
             agent = DDPG(sess, critic, actor, action_noise, replay_buffer)
             saver = tf.train.Saver()
-
+           
             if len(sys.argv) >= 2:
-                saver.restore(sess, 
-                        tf.train.latest_checkpoint("./models/" + sys.argv[1] + "/"))
-                print('~~~~~~~~~~~~~~~~~~')
-                print('Model Restored')
-                print('~~~~~~~~~~~~~~~~~~')
-            
+                for arg_idx, arg in enumerate(sys.argv[1:]):
+                    if "seed" in arg:
+                        saver.restore(sess, 
+                                tf.train.latest_checkpoint("./models/" +
+                                sys.argv[arg_idx+1] + "/"))
+                        print('~~~~~~~~~~~~~~~~~~')
+                        print('Model Restored')
+                        print('~~~~~~~~~~~~~~~~~~')
+                    if ".txt" in arg:
+                        with open(sys.argv[arg_idx+1], newline='') as csvfile:
+                            readCSV = csv.reader(csvfile, delimiter='\n')
+                            lesson_plan = []
+                            for row in readCSV:
+                                lesson_plan.append(ast.literal_eval(row[0]))
+                        print('~~~~~~~~~~~~~~~~~~')
+                        print('Lesson Planned')
+                        print('~~~~~~~~~~~~~~~~~~')
+                        agent.lesson_plan = lesson_plan
+ 
             startTime = time.time()
             agent.learn(env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE)
             avg_train_time.append(time.time() - startTime)
@@ -352,11 +367,6 @@ if __name__ == '__main__':
             n_demonstrate = 1
             #pdb.set_trace()
             for ep in range(n_demonstrate):
-                #env.manual_track = False
-                #env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
-                #env.manual_offset(2.0, 0.0, 0.0)
-                #env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
-                env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
