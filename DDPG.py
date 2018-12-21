@@ -344,7 +344,10 @@ if __name__ == '__main__':
                             readCSV = csv.reader(csvfile, delimiter='\n')
                             lesson_plan = []
                             for row in readCSV:
-                                lesson_plan.append(ast.literal_eval(row[0]))
+                                if row[0].startswith('#'):
+                                    continue
+                                else:
+                                    lesson_plan.append(ast.literal_eval(row[0]))
                         print('~~~~~~~~~~~~~~~~~~')
                         print('Lesson Planned')
                         print('~~~~~~~~~~~~~~~~~~')
