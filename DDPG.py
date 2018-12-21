@@ -24,7 +24,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 30000
+EPISODES = 2500
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -33,7 +33,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'trial_0_circle_track'
+LABEL = 'straight_line_to_S_track'
 BN = False
 L2 = False
 
@@ -98,7 +98,8 @@ class DDPG:
             #env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
             #env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
             #env.manual_offset(2.0, 0.0, 0.0)
-            env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
+            #env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
+            env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
             s = env.reset()
             ep_steps = 0
             while not done:
@@ -346,7 +347,8 @@ if __name__ == '__main__':
                 #env.manual_track = False
                 #env.manual_course([25.0, 0.0, 180.0], [-5.0, 0.0, 180.0])
                 #env.manual_offset(2.0, 0.0, 0.0)
-                env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
+                #env.manual_course([0.0, 20.0, 270.0], [-20.0, 0.0, 180.0])
+                env.manual_course([25.0, 25.0, 225.0], [-25.0, -25.0, 180.0])
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
                 #print("number of steps in test: {}: {}".format(ep+1, test_steps))
                 #print("Reward in test {}: {:.3f}".format(ep+1, r))
@@ -356,6 +358,7 @@ if __name__ == '__main__':
             total_test_goal_log.append(test_goal_log)
             env.close()
         tf.reset_default_graph()
+    
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print("avg_r: {:.3f}, ".format(np.mean(avg_total_test_rewards)) + 
           "std_r: {:.3f}, ".format(np.std(avg_total_test_rewards)) + 
@@ -366,4 +369,15 @@ if __name__ == '__main__':
           "std_t {}".format(timedelta(seconds=np.std(avg_train_time))))
     print("goal = {}".format(total_test_goal_log))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    pdb.set_trace()
+    with open("./summary.txt", 'w') as filename:
+        filename.write("avg_r: {:.3f}, ".format(
+                       np.mean(avg_total_test_rewards)) + 
+              "std_r: {:.3f}, ".format(np.std(avg_total_test_rewards)) + 
+              "avg_cvg: {} eps, ".format(int(np.mean(avg_convergence_ep))) + 
+              "std_cvg: {} eps".format(int(np.std(avg_convergence_ep))) + '\n')
+        filename.write("Converged: {} times".format(sum(convergence)) + '\n')
+        filename.write("avg_t {}, ".format(
+                 timedelta(seconds=np.mean(avg_train_time))) +
+                 "std_t {}".format(timedelta(seconds=np.std(avg_train_time)))
+                 + '\n')
+        filename.write("goal = {}".format(total_test_goal_log) + '\n')
