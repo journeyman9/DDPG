@@ -35,7 +35,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'straight_line_to_S_track'
+LABEL = 'lesson_plan_0'
 BN = False
 L2 = False
 
@@ -70,6 +70,7 @@ class DDPG:
         self.decay_steps = 0
 
         self.lesson_plan = None
+        self.lesson_idx = 0
 
         self.completed_episodes = 0
 
@@ -267,6 +268,10 @@ class DDPG:
 
     def test(self, env, policy, state, train_phase, sess):
         done = False
+        if self.lesson_plan:
+            course = self.lesson_plan[self.lesson_idx]
+            env.manual_course(course[0], course[1])
+            self.lesson_idx += 1
         s = env.reset()
         total_reward = 0.0
         steps = 0
@@ -364,12 +369,13 @@ if __name__ == '__main__':
             learned_policy = sess.graph.get_tensor_by_name(
                     'Actor/pi_online_network/pi_hat/Mul_4:0')
 
-            n_demonstrate = 1
+            if agent.lesson_plan:
+                n_demonstrate = len(lesson_plan)
+            else:
+                n_demonstrate = 1
             #pdb.set_trace()
             for ep in range(n_demonstrate):
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
-                #print("number of steps in test: {}: {}".format(ep+1, test_steps))
-                #print("Reward in test {}: {:.3f}".format(ep+1, r))
                 avg_test_reward.append(r)
                 test_goal_log.append(info['goal'])
             avg_total_test_rewards.append(np.mean(avg_test_reward))
@@ -385,7 +391,9 @@ if __name__ == '__main__':
     print("Converged: {} times".format(sum(convergence)))
     print("avg_t {}, ".format(timedelta(seconds=np.mean(avg_train_time))) +
           "std_t {}".format(timedelta(seconds=np.std(avg_train_time))))
-    print("goal = {}".format(total_test_goal_log))
+    for goal_seed in range(len(SEEDS)):
+        print("goal on seed {} = {}".format(SEEDS[goal_seed], 
+                                            total_test_goal_log[goal_seed]))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     with open("./summary.txt", 'w') as filename:
         filename.write("avg_r: {:.3f}, ".format(
@@ -398,4 +406,6 @@ if __name__ == '__main__':
                  timedelta(seconds=np.mean(avg_train_time))) +
                  "std_t {}".format(timedelta(seconds=np.std(avg_train_time)))
                  + '\n')
-        filename.write("goal = {}".format(total_test_goal_log) + '\n')
+        for goal_seed in range(len(SEEDS)):
+            filename.write("goal on seed {} = {}".format(SEEDS[goal_seed], 
+                                    total_test_goal_log[goal_seed]) + '\n')
