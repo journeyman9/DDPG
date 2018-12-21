@@ -247,9 +247,17 @@ class DDPG:
                 if (sum(self.goal_log[-100:]) >= 70 and 
                     np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
                     np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
+                    print('~~~~~~~~~~~~~~~~~~')
                     print('converged')
+                    print('~~~~~~~~~~~~~~~~~~')
                     self.convergence_flag = True
                     break
+                elif sum(self.goal_log[-100:]) <= 10:
+                    print('~~~~~~~~~~~~~~~~~~')
+                    print('Resetting p...')
+                    print('~~~~~~~~~~~~~~~~~~')
+                    self.p = 0.5
+                    self.decay_flag = False
             
             if settle_model:
                 print('saving early...')
