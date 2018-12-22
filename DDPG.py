@@ -26,7 +26,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 2500
+EPISODES = 7000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -238,7 +238,7 @@ class DDPG:
                   np.mean(self.rms_d2_log[-100:])))
             
             if not self.decay_flag: 
-                if (sum(self.goal_log[-100:]) >= 70 and 
+                if (sum(self.goal_log[-100:]) >= 80 and 
                     np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
                     np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
                     print('~~~~~~~~~~~~~~~~~~')
@@ -247,7 +247,7 @@ class DDPG:
                     self.decay_flag = True
             
             if self.p <= 0.235:
-                if (sum(self.goal_log[-100:]) >= 70 and 
+                if (sum(self.goal_log[-100:]) >= 80 and 
                     np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
                     np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
                     print('~~~~~~~~~~~~~~~~~~')
