@@ -26,7 +26,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 7000
+EPISODES = 20000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -35,7 +35,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'lesson_plan_0'
+LABEL = 'single_fixed'
 BN = False
 L2 = False
 
@@ -238,7 +238,7 @@ class DDPG:
                   np.mean(self.rms_d2_log[-100:])))
             
             if not self.decay_flag: 
-                if (sum(self.goal_log[-100:]) >= 80 and 
+                if (sum(self.goal_log[-100:]) >= 70 and 
                     np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
                     np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
                     print('~~~~~~~~~~~~~~~~~~')
@@ -246,8 +246,8 @@ class DDPG:
                     print('~~~~~~~~~~~~~~~~~~')
                     self.decay_flag = True
             
-            if self.p <= 0.235:
-                if (sum(self.goal_log[-100:]) >= 80 and 
+            if self.p <= 0.225:
+                if (sum(self.goal_log[-100:]) >= 70 and 
                     np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
                     np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
                     print('~~~~~~~~~~~~~~~~~~')
@@ -255,7 +255,7 @@ class DDPG:
                     print('~~~~~~~~~~~~~~~~~~')
                     self.convergence_flag = True
                     break
-                elif sum(self.goal_log[-100:]) <= 10:
+                elif sum(self.goal_log[-100:]) <= 50:
                     print('~~~~~~~~~~~~~~~~~~')
                     print('Resetting p...')
                     print('~~~~~~~~~~~~~~~~~~')
