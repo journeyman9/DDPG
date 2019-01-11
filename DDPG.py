@@ -165,8 +165,7 @@ class DDPG:
 
                 if self.steps % TRAIN_STEPS == 0 and \
                     self.replay_buffer.size() >= WARM_UP \
-                    and not done and self.evaluate_flag == False:
-                    
+                    and self.evaluate_flag == False:
                     s_batch, a_batch, r_batch, s__batch, d_batch = \
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
@@ -201,7 +200,7 @@ class DDPG:
                 self.steps += 1
                 ep_steps += 1
                 if self.decay_flag:
-                    if not self.evaluate_flag:
+                    if self.evaluate_flag == False:
                         self.p = 0.01 + (0.5 - 0.01) * \
                                  np.exp(-self.p_decay * self.decay_steps)
                         self.decay_steps += 1
@@ -269,7 +268,8 @@ class DDPG:
                     self.decay_steps = 0
                     self.evaluate_flag = False
 
-            if not self.decay_flag and self.replay_buffer.size() >= WARM_UP: 
+            if self.decay_flag == False and \
+                self.replay_buffer.size() >= WARM_UP: 
                 if (np.mean(self.r_log[-100:]) >= 0.9 * np.max(
                     self.r_log[-100:]) and 
                     self.perc_error(np.mean(self.r_log[-200:]),
