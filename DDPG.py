@@ -26,16 +26,17 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 20000
+EPISODES = 5000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
 TRAIN_STEPS = 1
+WARM_UP = 10000
 N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'single_fixed'
+LABEL = 'relative_reward'
 BN = False
 L2 = False
 
@@ -66,7 +67,7 @@ class DDPG:
 
         self.decay_flag = False
         self.p = 0.5
-        self.p_decay = 30 * 1.150e-5
+        self.p_decay = 2.75e-5
         self.decay_steps = 0
 
         self.lesson_plan = None
@@ -80,8 +81,12 @@ class DDPG:
     # Unique to truck backerupper
     def rms(self, x, axis=None):
         return np.sqrt(np.mean(np.square(x), axis=axis))
+
+    def perc_error(self, a, b):
+        return abs(b - a) / abs(b)
  
-    def learn(self, env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE):
+    def learn(self, env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE, 
+              WARM_UP):
         # Tensorboard
         file_writer = tf.summary.FileWriter(logdir, graph=self.sess.graph)
         best_reward = -float('inf')
@@ -133,9 +138,11 @@ class DDPG:
                     #            env.action_space.low, env.action_space.high)
                     a = np.clip(K.dot(s), env.action_space.low, 
                                 env.action_space.high)
+                elif self.p < 0.5:
+                    a = np.clip(a, env.action_space.low, env.action_space.high)
                 else:
                     a = np.clip(a + N, 
-                                env.action_space.low, env.action_space.high)
+                                env.action_space.low, env.action_space.high) 
                 action_log.append(a)
                 
                 q_log.append(self.critic.predict(s, a, train_phase=False))
@@ -153,10 +160,13 @@ class DDPG:
                     for key, value in info.items():
                         if value:
                             print(key, value)
+                    print('s2 = {:.3f}'.format(s_[2]))
+                    print('d2 = {:.3f}'.format(env.audit_error))
+                    print('psi_2 = {:.3f}'.format(np.degrees(s[1])))
                     print()
 
                 if self.steps % TRAIN_STEPS == 0 and \
-                                    self.replay_buffer.size() >= BATCH_SIZE:
+                                    self.replay_buffer.size() >= WARM_UP:
                     s_batch, a_batch, r_batch, s__batch, d_batch = \
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
@@ -232,35 +242,40 @@ class DDPG:
 
             self.completed_episodes += 1
 
-            print("Last 100: goal = {}, rms psi_2 = {:.4f}, rms d2 = {:.4f}".format(
-                  sum(self.goal_log[-100:]),
-                  np.mean(self.rms_psi_2_log[-100:]),
-                  np.mean(self.rms_d2_log[-100:])))
+            print("Last 100 =  goal: {}, ".format(sum(self.goal_log[-100:])) +                   "rms_psi_2: {:.3f}, ".format(np.mean(self.rms_psi_2_log[-100:])) +             "rms_d2: {:.3f}, ".format(np.mean(self.rms_d2_log[-100:])) +                   "avg_r: {:.3f}".format(np.mean(self.r_log[-100:])))
+            print("avg_r to beat: {:.3f}".format(
+                                            0.9 * np.max(self.r_log[-100:])))
+            print("Perc error: {:.3f}".format(self.perc_error(
+                  np.mean(self.r_log[-200:]), np.mean(self.r_log[-100:]))))
             
             if not self.decay_flag: 
-                if (sum(self.goal_log[-100:]) >= 70 and 
-                    np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
-                    np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
+                if (np.mean(self.r_log[-100:]) >= 0.9 * np.max(
+                    self.r_log[-100:]) and 
+                    self.perc_error(np.mean(self.r_log[-200:]),
+                    np.mean(self.r_log[-100:])) <= .05): 
                     print('~~~~~~~~~~~~~~~~~~')
-                    print('decaying LQR p...')
+                    print('Decaying LQR p...')
                     print('~~~~~~~~~~~~~~~~~~')
-                    self.decay_flag = True
             
-            if self.p <= 0.225:
-                if (sum(self.goal_log[-100:]) >= 70 and 
-                    np.mean(self.rms_psi_2_log[-100:]) <= 0.1254 * 1.10 and
-                    np.mean(self.rms_d2_log[-100:]) <= 0.6308 * 1.10):
+            if self.decay_flag: 
+                if (self.p <= 0.1 and 
+                    np.mean(self.r_log[-100:]) >= 0.9 * best_reward and 
+                    self.perc_error(np.mean(self.r_log[-200:]),
+                    np.mean(self.r_log[-100:])) <= .05):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('converged')
                     print('~~~~~~~~~~~~~~~~~~')
                     self.convergence_flag = True
                     break
-                elif sum(self.goal_log[-100:]) <= 50:
+                elif self.p <= 0.25 and sum(self.goal_log[-100:]) <= 50:
                     print('~~~~~~~~~~~~~~~~~~')
                     print('Resetting p...')
                     print('~~~~~~~~~~~~~~~~~~')
                     self.p = 0.5
                     self.decay_flag = False
+                    self.decay_steps = 0
+            else:
+                pass
             
             if settle_model:
                 print('saving early...')
@@ -354,7 +369,8 @@ if __name__ == '__main__':
                         agent.lesson_plan = lesson_plan
  
             startTime = time.time()
-            agent.learn(env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE)
+            agent.learn(env, EPISODES, TRAIN_STEPS, COPY_STEPS, BATCH_SIZE, 
+                        WARM_UP)
             avg_train_time.append(time.time() - startTime)
             convergence.append(agent.convergence_flag)
             avg_convergence_ep.append(agent.completed_episodes) 
