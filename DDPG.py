@@ -64,6 +64,7 @@ class DDPG:
         self.w = 0.5
 
         self.convergence_flag = False
+        self.evaluate_flag = False
 
         self.decay_flag = False
         self.p = 0.5
@@ -163,8 +164,9 @@ class DDPG:
                     print()
 
                 if self.steps % TRAIN_STEPS == 0 and \
-                                    self.replay_buffer.size() >= WARM_UP \
-                                    and not done:
+                    self.replay_buffer.size() >= WARM_UP \
+                    and not done and self.evaluate_flag == False:
+                    
                     s_batch, a_batch, r_batch, s__batch, d_batch = \
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
@@ -199,9 +201,10 @@ class DDPG:
                 self.steps += 1
                 ep_steps += 1
                 if self.decay_flag:
-                    self.p = 0.01 + (0.5 - 0.01) * \
-                             np.exp(-self.p_decay * self.decay_steps)
-                    self.decay_steps += 1
+                    if not self.evaluate_flag:
+                        self.p = 0.01 + (0.5 - 0.01) * \
+                                 np.exp(-self.p_decay * self.decay_steps)
+                        self.decay_steps += 1
                 
             self.q_value_log.append(np.mean(q_log))
             self.ep_steps_log.append(ep_steps)
@@ -249,6 +252,23 @@ class DDPG:
             if self.replay_buffer.size() < WARM_UP:
                 print("WARM_UP")
             
+            if self.evaluate_flag:
+                if self.goal_log[-1] and \
+                    self.r_log[-1] >= 0.9 * np.max(self.r_log[-100:]):
+                    print('~~~~~~~~~~~~~~~~~~')
+                    print('converged')
+                    print('~~~~~~~~~~~~~~~~~~')
+                    self.convergence_flag = True
+                    break
+                else:
+                    print('~~~~~~~~~~~~~~~~~~~~')
+                    print('Resetting p and eval')
+                    print('~~~~~~~~~~~~~~~~~~~~')
+                    self.p = 0.5
+                    self.decay_flag = False
+                    self.decay_steps = 0
+                    self.evaluate_flag = False
+
             if not self.decay_flag and self.replay_buffer.size() >= WARM_UP: 
                 if (np.mean(self.r_log[-100:]) >= 0.9 * np.max(
                     self.r_log[-100:]) and 
@@ -261,15 +281,16 @@ class DDPG:
             
             if self.decay_flag: 
                 if (self.p <= 0.1 and 
-                    np.mean(self.r_log[-100:]) >= 0.9 * best_reward and 
+                    np.mean(self.r_log[-100:]) >= 0.9 * np.max(
+                    self.r_log[-100:]) and 
                     self.perc_error(np.mean(self.r_log[-200:]),
                     np.mean(self.r_log[-100:])) <= .05 and
                     self.goal_log[-1] == True):
                     print('~~~~~~~~~~~~~~~~~~')
-                    print('converged')
+                    print('evaluating...')
                     print('~~~~~~~~~~~~~~~~~~')
-                    self.convergence_flag = True
-                    break
+                    self.evaluate_flag = True
+                    self.p = 0.0
                 elif (self.p <= 0.25 and sum(self.goal_log[-100:]) <= 50 and 
                       episode > 100):
                     print('~~~~~~~~~~~~~~~~~~')
@@ -278,6 +299,9 @@ class DDPG:
                     self.p = 0.5
                     self.decay_flag = False
                     self.decay_steps = 0
+                else:
+                    pass
+                
             else:
                 pass
             
@@ -401,6 +425,7 @@ if __name__ == '__main__':
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
                 avg_test_reward.append(r)
                 print("Test reward: {:.3f}".format(r[0, 0]))
+                print()
                 test_goal_log.append(info['goal'])
             avg_total_test_rewards.append(np.mean(avg_test_reward))
             total_test_goal_log.append(test_goal_log)
