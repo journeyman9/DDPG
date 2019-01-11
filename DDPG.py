@@ -26,7 +26,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 5000
+EPISODES = 4000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -160,13 +160,11 @@ class DDPG:
                     for key, value in info.items():
                         if value:
                             print(key, value)
-                    print('s2 = {:.3f}'.format(s_[2]))
-                    print('d2 = {:.3f}'.format(env.audit_error))
-                    print('psi_2 = {:.3f}'.format(np.degrees(s[1])))
                     print()
 
                 if self.steps % TRAIN_STEPS == 0 and \
-                                    self.replay_buffer.size() >= WARM_UP:
+                                    self.replay_buffer.size() >= WARM_UP \
+                                    and not done:
                     s_batch, a_batch, r_batch, s__batch, d_batch = \
                                     self.replay_buffer.sample_batch(BATCH_SIZE)
                     
@@ -247,8 +245,11 @@ class DDPG:
                                             0.9 * np.max(self.r_log[-100:])))
             print("Perc error: {:.3f}".format(self.perc_error(
                   np.mean(self.r_log[-200:]), np.mean(self.r_log[-100:]))))
+
+            if self.replay_buffer.size() < WARM_UP:
+                print("WARM_UP")
             
-            if not self.decay_flag: 
+            if not self.decay_flag and self.replay_buffer.size() >= WARM_UP: 
                 if (np.mean(self.r_log[-100:]) >= 0.9 * np.max(
                     self.r_log[-100:]) and 
                     self.perc_error(np.mean(self.r_log[-200:]),
@@ -256,18 +257,21 @@ class DDPG:
                     print('~~~~~~~~~~~~~~~~~~')
                     print('Decaying LQR p...')
                     print('~~~~~~~~~~~~~~~~~~')
+                    self.decay_flag = True
             
             if self.decay_flag: 
                 if (self.p <= 0.1 and 
                     np.mean(self.r_log[-100:]) >= 0.9 * best_reward and 
                     self.perc_error(np.mean(self.r_log[-200:]),
-                    np.mean(self.r_log[-100:])) <= .05):
+                    np.mean(self.r_log[-100:])) <= .05 and
+                    self.goal_log[-1] == True):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('converged')
                     print('~~~~~~~~~~~~~~~~~~')
                     self.convergence_flag = True
                     break
-                elif self.p <= 0.25 and sum(self.goal_log[-100:]) <= 50:
+                elif (self.p <= 0.25 and sum(self.goal_log[-100:]) <= 50 and 
+                      episode > 100):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('Resetting p...')
                     print('~~~~~~~~~~~~~~~~~~')
@@ -396,6 +400,7 @@ if __name__ == '__main__':
             for ep in range(n_demonstrate):
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
                 avg_test_reward.append(r)
+                print("Test reward: {:.3f}".format(r[0, 0]))
                 test_goal_log.append(info['goal'])
             avg_total_test_rewards.append(np.mean(avg_test_reward))
             total_test_goal_log.append(test_goal_log)
