@@ -26,7 +26,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 4000
+EPISODES = 1
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
@@ -36,7 +36,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'relative_reward'
+LABEL = 'transfer_1_to_3'
 BN = False
 L2 = False
 
@@ -52,6 +52,7 @@ class DDPG:
         self.q_value_log = []
         self.ep_steps_log = []
         self.r_log = [] 
+        self.specific_r_log = []
         self.noise_log = []
         self.a_log = []
         self.goal_log = []
@@ -208,6 +209,7 @@ class DDPG:
             self.q_value_log.append(np.mean(q_log))
             self.ep_steps_log.append(ep_steps)
             self.r_log.append(total_reward)
+            self.specific_r_log.append(total_reward / env.track_vector[-1, 4])
             self.noise_log.append(np.mean(N_log))
             self.a_log.append(np.mean(action_log))
             self.goal_log.append(info['goal'])
@@ -237,23 +239,27 @@ class DDPG:
                                       tag="Avg_action")
             episode_summary.value.add(simple_value=self.ep_steps_log[episode], 
                                       tag="Steps")
+            episode_summary.value.add(simple_value=self.specific_r_log[episode],
+                                      tag="Specific_reward")
             file_writer.add_summary(episode_summary, global_step=episode+1)
             file_writer.flush()
 
             self.completed_episodes += 1
 
-            print("Last 100 =  goal: {}, ".format(sum(self.goal_log[-100:])) +                   "rms_psi_2: {:.3f}, ".format(np.mean(self.rms_psi_2_log[-100:])) +             "rms_d2: {:.3f}, ".format(np.mean(self.rms_d2_log[-100:])) +                   "avg_r: {:.3f}".format(np.mean(self.r_log[-100:])))
-            print("avg_r to beat: {:.3f}".format(
-                                            0.9 * np.max(self.r_log[-100:])))
+            print("Last 100 =  goal: {}, ".format(sum(self.goal_log[-100:])) +                   "rms_psi_2: {:.3f}, ".format(np.mean(self.rms_psi_2_log[-100:])) +             "rms_d2: {:.3f}, ".format(np.mean(self.rms_d2_log[-100:])) +                   "specific avg_r: {:.3f}".format(np.mean(self.specific_r_log[-100:])))
+            print("specific avg_r to beat: {:.3f}".format(
+                                0.9 * np.max(self.specific_r_log[-100:])))
             print("Perc error: {:.3f}".format(self.perc_error(
-                  np.mean(self.r_log[-200:]), np.mean(self.r_log[-100:]))))
+                  np.mean(self.specific_r_log[-200:]), 
+                  np.mean(self.specific_r_log[-100:]))))
 
             if self.replay_buffer.size() < WARM_UP:
                 print("WARM_UP")
             
             if self.evaluate_flag:
                 if self.goal_log[-1] and \
-                    self.r_log[-1] >= 0.9 * np.max(self.r_log[-100:]):
+                    self.specific_r_log[-1] >= \
+                    0.9 * np.max(self.specific_r_log[-100:]):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('converged')
                     print('~~~~~~~~~~~~~~~~~~')
@@ -270,10 +276,10 @@ class DDPG:
 
             if self.decay_flag == False and \
                 self.replay_buffer.size() >= WARM_UP: 
-                if (np.mean(self.r_log[-100:]) >= 0.9 * np.max(
-                    self.r_log[-100:]) and 
-                    self.perc_error(np.mean(self.r_log[-200:]),
-                    np.mean(self.r_log[-100:])) <= .05): 
+                if (np.mean(self.specific_r_log[-100:]) >= 0.9 * np.max(
+                    self.specific_r_log[-100:]) and 
+                    self.perc_error(np.mean(self.specific_r_log[-200:]),
+                    np.mean(self.specific_r_log[-100:])) <= .05): 
                     print('~~~~~~~~~~~~~~~~~~')
                     print('Decaying LQR p...')
                     print('~~~~~~~~~~~~~~~~~~')
@@ -281,10 +287,10 @@ class DDPG:
             
             if self.decay_flag: 
                 if (self.p <= 0.1 and 
-                    np.mean(self.r_log[-100:]) >= 0.9 * np.max(
-                    self.r_log[-100:]) and 
-                    self.perc_error(np.mean(self.r_log[-200:]),
-                    np.mean(self.r_log[-100:])) <= .05 and
+                    np.mean(self.specific_r_log[-100:]) >= 0.9 * np.max(
+                    self.specific_r_log[-100:]) and 
+                    self.perc_error(np.mean(self.specific_r_log[-200:]),
+                    np.mean(self.specific_r_log[-100:])) <= .05 and
                     self.goal_log[-1] == True):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('evaluating...')
@@ -337,6 +343,7 @@ class DDPG:
 if __name__ == '__main__':
     avg_total_test_rewards = []
     total_test_goal_log = []
+    avg_total_specific_test_rewards = []
     avg_convergence_ep = []
     convergence = []
     avg_train_time = []
@@ -408,6 +415,7 @@ if __name__ == '__main__':
         with tf.Session() as sess:
             avg_test_reward = []
             test_goal_log = []
+            avg_specific_test_reward = []
             saved = tf.train.import_meta_graph(checkpoint_path + '.meta',
                                                clear_devices=True)
             saved.restore(sess, checkpoint_path)
@@ -424,11 +432,13 @@ if __name__ == '__main__':
             for ep in range(n_demonstrate):
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
                 avg_test_reward.append(r)
+                avg_specific_test_reward.append(r / env.track_vector[-1, 4])
                 print("Test reward: {:.3f}".format(r[0, 0]))
                 print()
                 test_goal_log.append(info['goal'])
             avg_total_test_rewards.append(np.mean(avg_test_reward))
             total_test_goal_log.append(test_goal_log)
+            avg_total_specific_test_rewards.append(np.mean(avg_specific_test_reward))
             env.close()
         tf.reset_default_graph()
     
@@ -443,6 +453,9 @@ if __name__ == '__main__':
     for goal_seed in range(len(SEEDS)):
         print("goal on seed {} = {}".format(SEEDS[goal_seed], 
                                             total_test_goal_log[goal_seed]))
+    for reward_seed in range(len(SEEDS)):
+        print("specific test reward on seed {} = {:.4f}".format(
+              SEEDS[reward_seed], avg_total_specific_test_rewards[reward_seed]))
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     with open("./summary.txt", 'w') as filename:
         filename.write("avg_r: {:.3f}, ".format(
@@ -458,3 +471,6 @@ if __name__ == '__main__':
         for goal_seed in range(len(SEEDS)):
             filename.write("goal on seed {} = {}".format(SEEDS[goal_seed], 
                                     total_test_goal_log[goal_seed]) + '\n')
+        for reward_seed in range(len(SEEDS)):
+            filename.write("specific test reward on seed {} = {:.4f}".format(
+              SEEDS[reward_seed], avg_total_specific_test_rewards[reward_seed]) + '\n')
