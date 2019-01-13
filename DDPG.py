@@ -26,7 +26,7 @@ import gym_truck_backerupper
 GAMMA = 0.99
 ALPHA_C = .001
 ALPHA_A = .0001
-EPISODES = 1
+EPISODES = 10000
 MAX_BUFFER = 1e6
 BATCH_SIZE = 64
 COPY_STEPS = 1
