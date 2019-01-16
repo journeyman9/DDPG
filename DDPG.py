@@ -36,7 +36,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'transfer_1_to_3'
+LABEL = 'single'
 BN = False
 L2 = False
 
@@ -248,7 +248,7 @@ class DDPG:
 
             print("Last 100 =  goal: {}, ".format(sum(self.goal_log[-100:])) +                   "rms_psi_2: {:.3f}, ".format(np.mean(self.rms_psi_2_log[-100:])) +             "rms_d2: {:.3f}, ".format(np.mean(self.rms_d2_log[-100:])) +                   "specific avg_r: {:.3f}".format(np.mean(self.specific_r_log[-100:])))
             print("specific avg_r to beat: {:.3f}".format(
-                                0.9 * np.max(self.specific_r_log[-100:])))
+                                0.82 * np.max(self.specific_r_log[-100:])))
             print("Perc error: {:.3f}".format(self.perc_error(
                   np.mean(self.specific_r_log[-200:]), 
                   np.mean(self.specific_r_log[-100:]))))
@@ -259,7 +259,7 @@ class DDPG:
             if self.evaluate_flag:
                 if self.goal_log[-1] and \
                     self.specific_r_log[-1] >= \
-                    0.9 * np.max(self.specific_r_log[-100:]):
+                    0.82 * np.max(self.specific_r_log[-100:]):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('converged')
                     print('~~~~~~~~~~~~~~~~~~')
@@ -276,7 +276,7 @@ class DDPG:
 
             if self.decay_flag == False and \
                 self.replay_buffer.size() >= WARM_UP: 
-                if (np.mean(self.specific_r_log[-100:]) >= 0.9 * np.max(
+                if (np.mean(self.specific_r_log[-100:]) >= 0.82 * np.max(
                     self.specific_r_log[-100:]) and 
                     self.perc_error(np.mean(self.specific_r_log[-200:]),
                     np.mean(self.specific_r_log[-100:])) <= .05): 
@@ -287,7 +287,7 @@ class DDPG:
             
             if self.decay_flag: 
                 if (self.p <= 0.1 and 
-                    np.mean(self.specific_r_log[-100:]) >= 0.9 * np.max(
+                    np.mean(self.specific_r_log[-100:]) >= 0.82 * np.max(
                     self.specific_r_log[-100:]) and 
                     self.perc_error(np.mean(self.specific_r_log[-200:]),
                     np.mean(self.specific_r_log[-100:])) <= .05 and
@@ -325,7 +325,7 @@ class DDPG:
         total_reward = 0.0
         steps = 0
         while not done:
-            env.render()
+            #env.render()
             a = sess.run(policy, feed_dict={state: s.reshape(1, s.shape[0]),
                                             train_phase: False})
             s_, r, done, info = env.step(a)
