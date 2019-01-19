@@ -36,7 +36,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'single'
+LABEL = 'transfer_25_to_random'
 BN = False
 L2 = False
 
@@ -92,6 +92,7 @@ class DDPG:
         # Tensorboard
         file_writer = tf.summary.FileWriter(logdir, graph=self.sess.graph)
         best_reward = -float('inf')
+        best_spec_r = -float('inf')
         start_rendering = False
         settle_model = False
         for episode in range(EPISODES):
@@ -115,10 +116,14 @@ class DDPG:
             while not done:
                 if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                     command = input()
-                    if command == 'render' or command == 'settle':
+                    if command == 'render' or command == 'settle' \
+                        or command == 'decay':
                         if command == 'render':
                             start_rendering = True
                             print('set render...')
+                        elif command == 'decay':
+                            self.decay_flag = True
+                            print('set decay...')
                         elif command == 'settle':
                             print('settling..')
                             settle_model = True
@@ -218,12 +223,15 @@ class DDPG:
             self.rms_psi_1_log.append(self.rms(psi_1_e_log))
             self.rms_psi_2_log.append(self.rms(psi_2_e_log))
             self.rms_d2_log.append(self.rms(d2_e_log))
-
+            '''
             if total_reward > best_reward:
                 best_reward = total_reward
+            '''
+            if self.specific_r_log[episode] > best_spec_r:
+                best_spec_r = self.specific_r_log[episode]
             print("Ep: {}, ".format(episode+1) + 
                   "r: {:.3f}, ".format(total_reward) +
-                  "best_r: {:.3f}, ".format(best_reward) + 
+                  "best_spec_r: {:.3f}, ".format(best_spec_r) + 
                   "qmax: {:.3f}, ".format(self.q_value_log[episode]) +
                   "steps: {}, ".format(self.ep_steps_log[episode]) +
                   "N: {:.3f}, ".format(self.noise_log[episode]) + 
@@ -427,7 +435,7 @@ if __name__ == '__main__':
             if agent.lesson_plan:
                 n_demonstrate = len(lesson_plan)
             else:
-                n_demonstrate = 1
+                n_demonstrate = 25
             #pdb.set_trace()
             for ep in range(n_demonstrate):
                 r, info = agent.test(env, learned_policy, state, train_phase, sess)
