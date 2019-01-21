@@ -71,6 +71,7 @@ class DDPG:
         self.p = 0.5
         self.p_decay = 2.75e-5
         self.decay_steps = 0
+        self.conv_crit = 0.82
 
         self.lesson_plan = None
         self.lesson_idx = 0
@@ -231,6 +232,7 @@ class DDPG:
                 best_spec_r = self.specific_r_log[episode]
             print("Ep: {}, ".format(episode+1) + 
                   "r: {:.3f}, ".format(total_reward) +
+                  "spec_r: {:.3f}, ".format(self.specific_r_log[episode]) + 
                   "best_spec_r: {:.3f}, ".format(best_spec_r) + 
                   "qmax: {:.3f}, ".format(self.q_value_log[episode]) +
                   "steps: {}, ".format(self.ep_steps_log[episode]) +
@@ -256,7 +258,7 @@ class DDPG:
 
             print("Last 100 =  goal: {}, ".format(sum(self.goal_log[-100:])) +                   "rms_psi_2: {:.3f}, ".format(np.mean(self.rms_psi_2_log[-100:])) +             "rms_d2: {:.3f}, ".format(np.mean(self.rms_d2_log[-100:])) +                   "specific avg_r: {:.3f}".format(np.mean(self.specific_r_log[-100:])))
             print("specific avg_r to beat: {:.3f}".format(
-                                0.82 * np.max(self.specific_r_log[-100:])))
+                        self.conv_crit * np.max(self.specific_r_log[-100:])))
             print("Perc error: {:.3f}".format(self.perc_error(
                   np.mean(self.specific_r_log[-200:]), 
                   np.mean(self.specific_r_log[-100:]))))
@@ -267,7 +269,7 @@ class DDPG:
             if self.evaluate_flag:
                 if self.goal_log[-1] and \
                     self.specific_r_log[-1] >= \
-                    0.82 * np.max(self.specific_r_log[-100:]):
+                    self.conv_crit * np.max(self.specific_r_log[-100:]):
                     print('~~~~~~~~~~~~~~~~~~')
                     print('converged')
                     print('~~~~~~~~~~~~~~~~~~')
@@ -284,8 +286,8 @@ class DDPG:
 
             if self.decay_flag == False and \
                 self.replay_buffer.size() >= WARM_UP: 
-                if (np.mean(self.specific_r_log[-100:]) >= 0.82 * np.max(
-                    self.specific_r_log[-100:]) and 
+                if (np.mean(self.specific_r_log[-100:]) >= self.conv_crit * \
+                    np.max(self.specific_r_log[-100:]) and 
                     self.perc_error(np.mean(self.specific_r_log[-200:]),
                     np.mean(self.specific_r_log[-100:])) <= .05): 
                     print('~~~~~~~~~~~~~~~~~~')
@@ -295,7 +297,7 @@ class DDPG:
             
             if self.decay_flag: 
                 if (self.p <= 0.1 and 
-                    np.mean(self.specific_r_log[-100:]) >= 0.82 * np.max(
+                    np.mean(self.specific_r_log[-100:]) >= self.conv_crit * np.max(
                     self.specific_r_log[-100:]) and 
                     self.perc_error(np.mean(self.specific_r_log[-200:]),
                     np.mean(self.specific_r_log[-100:])) <= .05 and
@@ -458,9 +460,15 @@ if __name__ == '__main__':
     print("Converged: {} times".format(sum(convergence)))
     print("avg_t {}, ".format(timedelta(seconds=np.mean(avg_train_time))) +
           "std_t {}".format(timedelta(seconds=np.std(avg_train_time))))
+    '''
     for goal_seed in range(len(SEEDS)):
         print("goal on seed {} = {}".format(SEEDS[goal_seed], 
                                             total_test_goal_log[goal_seed]))
+    '''
+    for goal_seed in range(len(SEEDS)):
+        print("goal on seed {} = {} / {}".format(SEEDS[goal_seed], 
+                                    sum(total_test_goal_log[goal_seed]), 
+                                    n_demonstrate))
     for reward_seed in range(len(SEEDS)):
         print("specific test reward on seed {} = {:.4f}".format(
               SEEDS[reward_seed], avg_total_specific_test_rewards[reward_seed]))
@@ -476,9 +484,15 @@ if __name__ == '__main__':
                  timedelta(seconds=np.mean(avg_train_time))) +
                  "std_t {}".format(timedelta(seconds=np.std(avg_train_time)))
                  + '\n')
+        '''
         for goal_seed in range(len(SEEDS)):
             filename.write("goal on seed {} = {}".format(SEEDS[goal_seed], 
                                     total_test_goal_log[goal_seed]) + '\n')
+        '''
+        for goal_seed in range(len(SEEDS)):
+            filename.write("goal on seed {} = {} / {}".format(SEEDS[goal_seed], 
+                                    sum(total_test_goal_log[goal_seed]), 
+                                    n_demonstrate) + '\n')
         for reward_seed in range(len(SEEDS)):
             filename.write("specific test reward on seed {} = {:.4f}".format(
               SEEDS[reward_seed], avg_total_specific_test_rewards[reward_seed]) + '\n')
