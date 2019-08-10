@@ -36,7 +36,7 @@ N_NEURONS1 = 400
 N_NEURONS2 = 300
 TAU = .001
 SEEDS = [0, 1, 12]
-LABEL = 'transfer_25_to_random'
+LABEL = 'name'
 BN = False
 L2 = False
 
@@ -139,8 +139,7 @@ class DDPG:
                 N_log.append(N[0])
                 a = self.actor.predict(s, train_phase=False)[0]  
 
-                K = np.array([-27.606229206749300, 99.829605935742920, 
-                              -7.853981633974539]) 
+                K = np.array([-24.7561, 94.6538, -7.8540]) 
                 if np.random.uniform(0, 1) < self.p:
                     #a = np.clip((1 - self.w) * a + self.w * K.dot(s),
                     #            env.action_space.low, env.action_space.high)
