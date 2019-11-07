@@ -47,13 +47,13 @@ python3 DDPG.py <modelname>
 Rendering does not occur by default because it speeds up training time. Simply type into the CLI the following and press enter. It does not matter that things print out, just type it fast enough and press enter.
 
 ```
-render
+>>> render
 ```
 
 If you no longer want to look at rendering, simply type the following again
 
 ```
-hide
+>>> hide
 ```
 
 ## Hyperparameters
@@ -79,7 +79,7 @@ L2 = False
 If training is not converging and you want to save the model where it is currently at, simply type the following into the CLI even though things are printing out. Press enter.
 
 ```
-settle
+>>> settle
 ```
 
 
@@ -87,7 +87,7 @@ settle
 This will trigger an early convergence where the probability of using the expert policy will decay. It may not save a model if the convergence is not met and will thus reset the expert policy. Type the following into the CLI even though things are printing out. Press enter.
 
 ```
-decay
+>>> decay
 ```
 
 
