@@ -2,6 +2,15 @@
 
 This repo runs the DDPG algorithm for training on the gym-truck-backerupper custom OpenAI gym environment. This is NOT a vanilla DDPG algorithm as certain hyperparameters are tuned and some complex machine teaching strategies were employed. The Ornstein-Uhlenbeck noise is used for exploration, but was found to be insufficient for a really simply straight line path for the tractor-trailer. Since DDPG is an off-policy algorithm, an expert policy is used `50%` of the time and is decayed once convergence starts. The rest of the time, the DDPG algorithm predicts and some exploration noise is added.
 
+## Dependencies
+
+```
+tensorflow==1.12
+gym-truck-backerupper
+ast
+collections
+```
+
 ## What to expect
 
 The code is designed so that one can run the code through a list of initial seeds to combat the stochasticity with training. It is recommended to at least run 3 before making any decision, but more is better. The code will run until the convergence criteria is met, which basically consists of a percent error change of less than `5%` and the normalized reward is larger than a continuously checked value. 
