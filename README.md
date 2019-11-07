@@ -39,7 +39,7 @@ Train with paths specified in `.txt` file, where the scripts will randomly selec
 Resume training using previous weights and biases
 
 ```
-python3 DDPG.py <modelname>
+>>> python3 DDPG.py <modelname>
 ```
 
 ## Rendering
