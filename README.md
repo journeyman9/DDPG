@@ -39,8 +39,10 @@ Train with paths specified in `.txt` file, where the scripts will randomly selec
 Resume training using previous weights and biases
 
 ```
->>> python3 DDPG.py <modelname>
+>>> python3 DDPG.py models/<modelname>
 ```
+
+NOTE: You can run both as arguments at the same time
 
 ## Rendering
 
